@@ -29,9 +29,9 @@ mvnw*
 !gradle/wrapper/gradle-wrapper.jar
 
 ### Spring Boot ###
-*.properties
+# *.properties
 *.yml
-.env
+# .env
 .DS_Store
 
 ### OS ###
