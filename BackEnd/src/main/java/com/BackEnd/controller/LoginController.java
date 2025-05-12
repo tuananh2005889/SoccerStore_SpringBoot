@@ -4,6 +4,7 @@ import com.BackEnd.service.LoginService;
 import com.BackEnd.config.JwtUtil;
 import com.BackEnd.dto.GoogleLoginRequest;
 import com.BackEnd.dto.GoogleLoginResponse;
+import com.BackEnd.dto.LoginRequest;
 import com.BackEnd.model.User;
 
 import org.apache.hc.core5.http.HttpStatus;
@@ -60,10 +61,26 @@ public class LoginController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<String> logIN(@RequestBody User userss) {
-        Optional<User> user = loginService.Login(userss.getUserName(), userss.getPassword());
-        return user.map(value -> ResponseEntity.ok("Login successful!"))
-                .orElseGet(() -> ResponseEntity.status(401).body("Invalid username or password"));
+    public ResponseEntity<?> logIN(@RequestBody User loginRequest) {
+        // 1. Kiểm tra username/password
+        Optional<User> userOpt = loginService.Login(
+                loginRequest.getUserName(),
+                loginRequest.getPassword());
+
+        if (userOpt.isEmpty()) {
+            return ResponseEntity
+                    .status(HttpStatus.SC_UNAUTHORIZED)
+                    .body(Collections.singletonMap("error", "Invalid username or password"));
+        }
+
+        User user = userOpt.get();
+
+        // 2. Sinh JWT
+        String jwt = jwtUtil.generateToken(user.getUserName(), user.getUserId());
+
+        // 3. Trả về JSON
+        LoginRequest resp = new LoginRequest(jwt, user.getUserId(), user.getUserName());
+        return ResponseEntity.ok(resp);
     }
 
     @PostMapping("/google")

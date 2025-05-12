@@ -7,7 +7,8 @@ import Products from "./Products";
 const HomePage: React.FC = () => {
     return (
       <div className="font-sans antialiased text-gray-900">
-        <Navbar />
+        <Navbar/>
+        <div className="h-16"/>
         <Hero />
         <About />
         <Products />
