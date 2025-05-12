@@ -1,6 +1,5 @@
 package com.BackEnd.dto;
 
-
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -15,13 +14,8 @@ public class ProductDTO {
     private double price;
     int quantity;
     String description;
-    private String compatibleVehicles;
     private Integer yearOfManufacture;
     String size;
     private String material;
-    double weight;
-    double discount;
-    String warranty;
-
 
 }
