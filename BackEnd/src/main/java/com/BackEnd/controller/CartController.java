@@ -22,10 +22,6 @@ public class CartController {
         this.cartService = cartService;
     }
 
-    /**
-     * GET /app/cart?userName={userName}
-     * Tạo hoặc lấy cart active cho user.
-     */
     @GetMapping
     public ResponseEntity<CartBasicInfoDTO> getOrCreateActiveCart(
             @RequestParam String userName) {
@@ -41,10 +37,6 @@ public class CartController {
         }
     }
 
-    /**
-     * GET /app/cart/items?cartId={cartId}
-     * Lấy danh sách item trong cart.
-     */
     @GetMapping("/items")
     public ResponseEntity<List<CartItemDTO>> getAllCartItems(
             @RequestParam Long cartId) {
@@ -57,10 +49,6 @@ public class CartController {
         }
     }
 
-    /**
-     * POST /app/cart/add
-     * Thêm item vào cart.
-     */
     @PostMapping("/add")
     public ResponseEntity<CartItemDTO> addItemToCart(
             @RequestBody AddToCartRequest request) {
@@ -76,10 +64,6 @@ public class CartController {
         }
     }
 
-    /**
-     * DELETE /app/cart/remove
-     * Xóa item khỏi cart (có thể dùng DELETE với body hoặc param).
-     */
     @DeleteMapping("/remove")
     public ResponseEntity<Void> removeItem(
             @RequestParam Long cartId,
@@ -96,10 +80,6 @@ public class CartController {
         }
     }
 
-    /**
-     * DELETE /app/cart/clear?cartId={cartId}
-     * Xóa toàn bộ items trong cart.
-     */
     @DeleteMapping("/clear")
     public ResponseEntity<Void> clearCart(
             @RequestParam Long cartId) {
@@ -115,10 +95,6 @@ public class CartController {
         }
     }
 
-    /**
-     * GET /app/cart/image-urls?cartId={cartId}
-     * Lấy danh sách URL ảnh theo từng cart item.
-     */
     @GetMapping("/image-urls")
     public ResponseEntity<List<String>> getImageUrls(
             @RequestParam Long cartId) {
@@ -134,10 +110,6 @@ public class CartController {
         }
     }
 
-    /**
-     * POST /app/cart/checkout?cartId={cartId}
-     * Thanh toán cart, chuyển trạng thái sang PAID.
-     */
     @PostMapping("/checkout")
     public ResponseEntity<String> checkoutCart(
             @RequestParam Long cartId) {
@@ -153,10 +125,6 @@ public class CartController {
         }
     }
 
-    /**
-     * GET /app/cart/status?cartId={cartId}
-     * Lấy trạng thái hiện tại của cart.
-     */
     @GetMapping("/status")
     public ResponseEntity<Cart> getCartStatus(
             @RequestParam Long cartId) {

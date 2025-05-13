@@ -11,14 +11,31 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 public class DTOConverter {
-
     public static CartItemDTO toCartItemDTO(CartItem cartItem) {
+        Long cartItemId = cartItem.getCartItemId();
+        Long productId = cartItem.getProduct().getProductId();
+        String name = cartItem.getProduct().getName();
+        Double price = cartItem.getProduct().getPrice();
+        // Lấy hình đầu tiên nếu có
+        String brand = cartItem.getProduct().getBrand();
+        String description = cartItem.getProduct().getDescription();
+        String imageUrl = cartItem.getProduct().getImages() != null
+                && !cartItem.getProduct().getImages().isEmpty()
+                        ? cartItem.getProduct().getImages().get(0)
+                        : "";
+        Integer quantity = cartItem.getQuantity();
+
         return new CartItemDTO(
-                cartItem.getProduct().getProductId(),
-                cartItem.getProduct().getName(),
-                cartItem.getQuantity()
-        );
+                cartItemId,
+                productId,
+                name,
+                price,
+                imageUrl,
+                brand,
+                description,
+                quantity);
     }
+
     public static CartDTO toCartDTO(Cart cart) {
         List<CartItemDTO> cartItemDTOs = cart.getCartItems().stream()
                 .map(DTOConverter::toCartItemDTO)
@@ -28,9 +45,9 @@ public class DTOConverter {
                 cart.getCartId(),
                 cart.getUser().getUserId(),
                 cartItemDTOs,
-                cart.getStatus().name()
-        );
+                cart.getStatus().name());
     }
+
     public static CartBasicInfoDTO toCartBasicInfoDTO(Cart cart) {
         Long cartId = cart.getCartId();
         String status = cart.getStatus().name();
@@ -42,6 +59,5 @@ public class DTOConverter {
         int quantity = cartItem.getQuantity();
         return new BasicCartItemDTO(productId, quantity);
     }
-
 
 }
