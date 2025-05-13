@@ -46,20 +46,6 @@ public class CartService {
         return DTOConverter.toCartBasicInfoDTO(cart);
     }
 
-    /**
-     * Lấy danh sách CartItemDTO trong cart
-     */
-    public List<CartItemDTO> getCartItemsInActiveCart(Long cartId) {
-        Cart cart = cartRepo.findById(cartId)
-                .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
-        return cart.getCartItems().stream()
-                .map(DTOConverter::toCartItemDTO)
-                .collect(Collectors.toList());
-    }
-
-    /**
-     * Thêm hoặc tăng số lượng item trong cart
-     */
     public CartItemDTO addItemToCart(AddToCartRequest req) {
         if (req.getQuantity() <= 0) {
             throw new IllegalArgumentException("Quantity must be greater than 0");
@@ -137,4 +123,30 @@ public class CartService {
         List<String> urls = cartRepo.findImageUrlPerCartItem(cartId);
         return urls != null ? urls : Collections.emptyList();
     }
+
+    // src/main/java/com/BackEnd/service/CartService.java
+    public List<CartItemDTO> getCartItemsInActiveCart(Long cartId) {
+        Cart cart = cartRepo.findById(cartId)
+                .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
+
+        return cart.getCartItems().stream()
+                .map(ci -> {
+                    Product p = ci.getProduct();
+                    // lấy ảnh đầu tiên
+                    String img = p.getImages().isEmpty()
+                            ? ""
+                            : p.getImages().get(0);
+                    return new CartItemDTO(
+                            ci.getCartItemId(),
+                            p.getProductId(),
+                            p.getName(),
+                            p.getPrice(),
+                            img,
+                            p.getBrand(),
+                            p.getDescription(),
+                            ci.getQuantity());
+                })
+                .collect(Collectors.toList());
+    }
+
 }
