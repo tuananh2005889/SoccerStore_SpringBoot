@@ -3,7 +3,7 @@ import { FiUser, FiLock, FiMail, FiPhone } from "react-icons/fi";
 import { motion, AnimatePresence } from "framer-motion";
 import axios from "axios";
 import toast from "react-hot-toast";
-import { useNavigate } from "react-router-dom";
+import { data, useNavigate } from "react-router-dom";
 
 const Login = () => {
   const [activeTab, setActiveTab] = useState<"login" | "signup">("login");
@@ -46,6 +46,7 @@ const Login = () => {
       if (response.data?.token) {
         toast.success("Login successful!");
         localStorage.setItem("token", response.data.token);
+        localStorage.setItem('username', loginForm.userName);
         navigate("/");
       } else {
         toast.error("Invalid credentials!");

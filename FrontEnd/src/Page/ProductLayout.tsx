@@ -1,11 +1,12 @@
-import { FiShoppingCart, FiHeart } from "react-icons/fi";
+import { FiShoppingCart } from "react-icons/fi";
 import { FaStar, FaRegStar, FaStarHalfAlt } from "react-icons/fa";
 import Navbar from "../Homepage/Navbar";
 import { useEffect, useState } from "react";
-import { Search, Filter } from "lucide-react";
+import { Filter } from "lucide-react";
 import Footer from "../Homepage/Footer";
-import axios from "axios";
-import toast from "react-hot-toast";
+import axios, { AxiosError } from "axios"; // Import AxiosError
+import toast, { Toaster } from "react-hot-toast";
+import { useCart } from "../context/CartContext";
 
 interface Product {
   productId: number;
@@ -24,6 +25,7 @@ interface Product {
 }
 
 const ProductLayout = () => {
+  const { addToCart } = useCart();
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -32,7 +34,7 @@ const ProductLayout = () => {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 1000]);
   const [showFilters, setShowFilters] = useState(false);
-  
+
   const productsPerPage = 12;
 
   // Pagination logic
@@ -45,7 +47,6 @@ const ProductLayout = () => {
     try {
       setLoading(true);
       const res = await axios.get("http://localhost:8080/app/product/all");
-      // Add mock ratings and reviews for demo
       const productsWithRatings = res.data.map((product: Product) => ({
         ...product,
         rating: Math.random() * 2 + 3, // Random rating between 3-5
@@ -55,7 +56,11 @@ const ProductLayout = () => {
       setFilteredProducts(productsWithRatings);
     } catch (error) {
       console.error("Error fetching products:", error);
-      toast.error("Failed to load products");
+      if (axios.isAxiosError(error)) { // Check if it's an Axios error
+        toast.error(`Failed to load products: ${error.response?.data?.message || error.message}`);
+      } else {
+        toast.error("Failed to load products: An unknown error occurred");
+      }
     } finally {
       setLoading(false);
     }
@@ -69,15 +74,15 @@ const ProductLayout = () => {
   };
 
   const filterProducts = (
-    term: string, 
-    category: string | null, 
+    term: string,
+    category: string | null,
     range: [number, number]
   ) => {
     const filtered = products.filter(
       (product) =>
         (product.brand.toLowerCase().includes(term) ||
-         product.name.toLowerCase().includes(term) ||
-         product.category.toLowerCase().includes(term)) &&
+          product.name.toLowerCase().includes(term) ||
+          product.category.toLowerCase().includes(term)) &&
         (category ? product.category === category : true) &&
         (product.price >= range[0] && product.price <= range[1])
     );
@@ -96,11 +101,43 @@ const ProductLayout = () => {
     setCurrentPage(1);
   };
 
+  const handleAddToCart = async (product: Product) => {
+    if (product.quantity <= 0) {
+      toast.error("Product is out of stock!");
+      return;
+    }
+    try {
+      await addToCart({
+        cartItemId: 0, // Add default cartItemId that will be set by backend
+        productId: product.productId,
+        name: product.name,
+        price: product.price,
+        quantity: 1,
+        image: product.images[0] || ''
+      });
+      toast.success(`${product.name} added to cart successfully!`); // Thông báo thành công
+    } catch (error) {
+      console.error("Error adding to cart:", error);
+      // Kiểm tra xem error có phải là AxiosError không để lấy thông tin chi tiết hơn
+      if (axios.isAxiosError(error)) {
+        const axiosError = error as AxiosError<{ message?: string; error?: string; status?: number }>; // Type assertion
+        // Ưu tiên message từ response data, sau đó là error message chung
+        const errorMessage = axiosError.response?.data?.message || axiosError.response?.data?.error || axiosError.message;
+        const errorCode = axiosError.response?.status || 'N/A';
+        toast.error(`Failed to add product to cart. Error ${errorCode}: ${errorMessage}`);
+      } else if (error instanceof Error) {
+        toast.error(`Failed to add product to cart: ${error.message}`);
+      } else {
+        toast.error("Failed to add product to cart: An unknown error occurred.");
+      }
+    }
+  };
+
   const renderStars = (rating: number) => {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
-    
+
     for (let i = 1; i <= 5; i++) {
       if (i <= fullStars) {
         stars.push(<FaStar key={i} className="text-yellow-400" />);
@@ -110,7 +147,7 @@ const ProductLayout = () => {
         stars.push(<FaRegStar key={i} className="text-yellow-400" />);
       }
     }
-    
+
     return stars;
   };
 
@@ -122,7 +159,24 @@ const ProductLayout = () => {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />
       <div className="h-10">
-
+      <Toaster
+          position="top-center" // Vị trí hiển thị toast (tùy chọn)
+          reverseOrder={false}  // Thứ tự hiển thị (tùy chọn)
+          toastOptions={{ // Tùy chỉnh chung cho toast (tùy chọn)
+            duration: 3000, // Thời gian hiển thị mặc định là 3 giây
+            style: {
+              background: '#363636',
+              color: '#fff',
+            },
+            success: {
+              duration: 3000,
+             
+            },
+            error: {
+              duration: 3000, // Lỗi hiển thị lâu hơn
+            }
+          }}
+        />
       </div>
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-16">
         {/* Hero Section */}
@@ -143,19 +197,19 @@ const ProductLayout = () => {
 
         {/* Filter Section */}
         <div className="mb-8 flex flex-col md:flex-row gap-4 items-start">
-          <button 
+          <button
             onClick={() => setShowFilters(!showFilters)}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Filter size={18} />
             <span>Filters</span>
           </button>
-          
+
           <div className="flex gap-2 flex-wrap">
-            <button 
+            <button
               className={`px-4 py-2 rounded-lg transition-colors ${
-                !selectedCategory 
-                  ? 'bg-green-600 text-white' 
+                !selectedCategory
+                  ? 'bg-green-600 text-white'
                   : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-50'
               }`}
               onClick={() => handleCategoryFilter(null)}
@@ -206,11 +260,11 @@ const ProductLayout = () => {
               <>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                   {currentProducts.map((product) => (
-                    <div 
-                      key={product.productId} 
+                    <div
+                      key={product.productId}
                       className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 group relative"
                     >
-                      
+
                       <div className="relative h-48 overflow-hidden">
                         {product.images && product.images.length > 0 ? (
                           <img
@@ -223,24 +277,27 @@ const ProductLayout = () => {
                             <span className="text-gray-400">No image available</span>
                           </div>
                         )}
-                      
-                        <button className="absolute bottom-0 left-0 right-0 bg-green-600 text-white py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-green-700 text-sm font-medium">
+
+                        <button
+                          onClick={() => handleAddToCart(product)}
+                          className="absolute bottom-0 left-0 right-0 bg-green-600 text-white py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-green-700 text-sm font-medium"
+                        >
                           ADD TO CART
                         </button>
                       </div>
-                      
+
                       <div className="p-4">
                         <div className="flex justify-between items-start mb-1">
                           <h3 className="text-lg font-semibold text-gray-900 line-clamp-1 hover:text-green-600 transition-colors">
                             {product.name}
                           </h3>
-                         
+
                         </div>
                         <div className="text-lg font-bold text-green-600 whitespace-nowrap">
-                            ${product.price.toFixed(2)}
+                          ${product.price.toFixed(2)}
                         </div>
                         <p className="text-sm text-gray-600 mb-2">{product.brand}</p>
-                        
+
                         {product.rating && (
                           <div className="flex items-center gap-1 mb-2">
                             {renderStars(product.rating)}
@@ -249,20 +306,21 @@ const ProductLayout = () => {
                             </span>
                           </div>
                         )}
-                        
+
                         <div className="flex justify-between items-center mt-3">
                           <span className={`px-2 py-1 rounded-full text-xs ${
-                            product.quantity > 10 
-                              ? 'bg-green-100 text-green-800' 
-                              : product.quantity > 0 
-                                ? 'bg-yellow-100 text-yellow-800' 
+                            product.quantity > 10
+                              ? 'bg-green-100 text-green-800'
+                              : product.quantity > 0
+                                ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-red-100 text-red-800'
                           }`}>
                             {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}
                           </span>
-                          <button className="p-1.5 bg-green-50 rounded-full text-green-600 hover:bg-green-100 transition-colors">
+                          {/* Nút giỏ hàng nhỏ này có thể không cần thiết nếu đã có nút "ADD TO CART" lớn hơn khi hover */}
+                          {/* <button className="p-1.5 bg-green-50 rounded-full text-green-600 hover:bg-green-100 transition-colors">
                             <FiShoppingCart className="w-4 h-4" />
-                          </button>
+                          </button> */}
                         </div>
                       </div>
                     </div>
@@ -287,7 +345,7 @@ const ProductLayout = () => {
                       >
                         ‹
                       </button>
-                      
+
                       {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
                         let pageNum;
                         if (totalPages <= 5) {
@@ -299,7 +357,7 @@ const ProductLayout = () => {
                         } else {
                           pageNum = currentPage - 2 + i;
                         }
-                        
+
                         return (
                           <button
                             key={pageNum}
@@ -314,7 +372,7 @@ const ProductLayout = () => {
                           </button>
                         );
                       })}
-                      
+
                       <button
                         onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                         disabled={currentPage === totalPages}
@@ -337,12 +395,14 @@ const ProductLayout = () => {
               <div className="bg-white rounded-xl p-12 text-center">
                 <h3 className="text-xl font-medium text-gray-700 mb-2">No products found</h3>
                 <p className="text-gray-500 mb-4">Try adjusting your search or filter criteria</p>
-                <button 
+                <button
                   onClick={() => {
                     setSearchTerm('');
                     setSelectedCategory(null);
                     setPriceRange([0, 1000]);
+                    // Reset về danh sách sản phẩm ban đầu, không phải filteredProducts có thể đang rỗng
                     setFilteredProducts(products);
+                    setCurrentPage(1); // Reset về trang đầu tiên
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >

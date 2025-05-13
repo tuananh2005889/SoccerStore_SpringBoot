@@ -1,106 +1,171 @@
 package com.BackEnd.controller;
 
 import com.BackEnd.dto.*;
-import com.BackEnd.repository.CartRepository;
-import com.BackEnd.service.CartService;
 import com.BackEnd.model.Cart;
+import com.BackEnd.service.CartService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.web.ErrorResponse;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 @RestController
 @RequestMapping("/app/cart")
+@Slf4j
 public class CartController {
-  
+
     private final CartService cartService;
-    private final CartRepository cartRepo;
-    public CartController(CartService cartService, CartRepository cartRepo) {
+
+    public CartController(CartService cartService) {
         this.cartService = cartService;
-        this.cartRepo = cartRepo;
     }
 
-    // done. fetch items tu cart
+    /**
+     * GET /app/cart?userName={userName}
+     * Tạo hoặc lấy cart active cho user.
+     */
+    @GetMapping
+    public ResponseEntity<CartBasicInfoDTO> getOrCreateActiveCart(
+            @RequestParam String userName) {
+        try {
+            CartBasicInfoDTO dto = cartService.getOrCreateActiveCartDTO(userName);
+            return ResponseEntity.ok(dto);
+        } catch (RuntimeException ex) {
+            log.warn("User '{}' not found when getting/creating cart", userName, ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception ex) {
+            log.error("Unexpected error in getOrCreateActiveCart", ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * GET /app/cart/items?cartId={cartId}
+     * Lấy danh sách item trong cart.
+     */
     @GetMapping("/items")
-    public ResponseEntity<List<CartItemDTO>> getAllCartItems(@RequestParam Long cartId) {
+    public ResponseEntity<List<CartItemDTO>> getAllCartItems(
+            @RequestParam Long cartId) {
         try {
             List<CartItemDTO> items = cartService.getCartItemsInActiveCart(cartId);
             return ResponseEntity.ok(items);
-        } catch (RuntimeException e) {
+        } catch (RuntimeException ex) {
+            log.warn("Cart {} not found when fetching items", cartId, ex);
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
 
-    // done. create/get cart
-    @PostMapping("/active")
-    public ResponseEntity<CartBasicInfoDTO> getOrCreateActiveCart(@RequestParam String userName) {
-        try {
-            CartBasicInfoDTO dto = cartService.getOrCreateActiveCartDTO(userName);
-            return ResponseEntity.ok(dto);
-        } catch (RuntimeException e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(null);
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    // done. add item to cart
+    /**
+     * POST /app/cart/add
+     * Thêm item vào cart.
+     */
     @PostMapping("/add")
-    public ResponseEntity<CartItemDTO> addItemToCart(@RequestBody AddToCartRequest addToCartRequest) {
+    public ResponseEntity<CartItemDTO> addItemToCart(
+            @RequestBody AddToCartRequest request) {
         try {
-            // Call service to add product to cart
-            CartItemDTO dto = cartService.addItemToCart(addToCartRequest);
-
-            // Return response with ItemDTO
+            CartItemDTO dto = cartService.addItemToCart(request);
             return ResponseEntity.ok(dto);
-
-        } catch (IllegalArgumentException e) {
-            // Handle specific errors
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
-
-        } catch (Exception e) {
-            // Handle other errors
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid add-to-cart request: {}", request, ex);
+            return ResponseEntity.badRequest().build();
+        } catch (Exception ex) {
+            log.error("Error adding item to cart", ex);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
+    /**
+     * DELETE /app/cart/remove
+     * Xóa item khỏi cart (có thể dùng DELETE với body hoặc param).
+     */
+    @DeleteMapping("/remove")
+    public ResponseEntity<Void> removeItem(
+            @RequestParam Long cartId,
+            @RequestParam Long productId) {
+        try {
+            cartService.removeItemFromCart(cartId, productId);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException ex) {
+            log.warn("Failed to remove product {} from cart {}", productId, cartId, ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception ex) {
+            log.error("Error removing item from cart", ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 
-    @GetMapping("/imageUrls")
-    public ResponseEntity<List<String>> getImageUrlPerCartItem(@RequestParam Long cartId) {
-        try{
-            List<String> imageUrls =
-                    cartService.getImageUrlPerCartItem(cartId);
-            if(imageUrls == null || imageUrls.isEmpty()){
+    /**
+     * DELETE /app/cart/clear?cartId={cartId}
+     * Xóa toàn bộ items trong cart.
+     */
+    @DeleteMapping("/clear")
+    public ResponseEntity<Void> clearCart(
+            @RequestParam Long cartId) {
+        try {
+            cartService.clearCart(cartId);
+            return ResponseEntity.noContent().build();
+        } catch (RuntimeException ex) {
+            log.warn("Failed to clear cart {}", cartId, ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception ex) {
+            log.error("Error clearing cart", ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    /**
+     * GET /app/cart/image-urls?cartId={cartId}
+     * Lấy danh sách URL ảnh theo từng cart item.
+     */
+    @GetMapping("/image-urls")
+    public ResponseEntity<List<String>> getImageUrls(
+            @RequestParam Long cartId) {
+        try {
+            List<String> urls = cartService.getImageUrlPerCartItem(cartId);
+            if (urls.isEmpty()) {
                 return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
             }
-            return ResponseEntity.ok(imageUrls);
-        }catch(Exception e){
-            e.printStackTrace();
+            return ResponseEntity.ok(urls);
+        } catch (Exception ex) {
+            log.error("Error fetching image URLs for cart {}", cartId, ex);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
-    // API thanh toán giỏ hàng (cập nhật trạng thái thành PAID)
+    /**
+     * POST /app/cart/checkout?cartId={cartId}
+     * Thanh toán cart, chuyển trạng thái sang PAID.
+     */
     @PostMapping("/checkout")
-    public ResponseEntity<?> checkout(@RequestParam Long cartId) {
-        cartService.checkoutCart(cartId);
-        return ResponseEntity.ok("Cart successfully checked out and paid.");
+    public ResponseEntity<String> checkoutCart(
+            @RequestParam Long cartId) {
+        try {
+            cartService.checkoutCart(cartId);
+            return ResponseEntity.ok("Cart successfully checked out and paid.");
+        } catch (RuntimeException ex) {
+            log.warn("Cart {} not found for checkout", cartId, ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Cart not found");
+        } catch (Exception ex) {
+            log.error("Error during checkout for cart {}", cartId, ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Checkout failed");
+        }
     }
 
-    // @GetMapping("/activate")
-    // public ResponseEntity<Cart> getActiveCart(@RequestParam String userName) {
-    // Cart cart = cartService.createCart(userName); // tạo mới nếu chưa có
-    // return ResponseEntity.ok(cart);
-    // }
-    // API kiểm tra trạng thái giỏ hàng
+    /**
+     * GET /app/cart/status?cartId={cartId}
+     * Lấy trạng thái hiện tại của cart.
+     */
     @GetMapping("/status")
-    public ResponseEntity<Cart> getCartStatus(@RequestParam Long cartId) {
-        Cart cart = cartService.getCartStatus(cartId);
-        return ResponseEntity.ok(cart); // Trả về trạng thái giỏ hàng
+    public ResponseEntity<Cart> getCartStatus(
+            @RequestParam Long cartId) {
+        try {
+            Cart cart = cartService.getCartStatus(cartId);
+            return ResponseEntity.ok(cart);
+        } catch (RuntimeException ex) {
+            log.warn("Cart {} not found when getting status", cartId, ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        }
     }
 }

@@ -33,7 +33,7 @@ import com.google.api.client.json.gson.GsonFactory;
 
 @RestController
 @RequestMapping("/auth")
-@CrossOrigin(origins = "*")
+@CrossOrigin(origins = "http://localhost:5173", allowCredentials = "true")
 public class LoginController {
 
     @Autowired
