@@ -1,12 +1,13 @@
 import { FiShoppingCart } from "react-icons/fi";
 import { FaStar, FaRegStar, FaStarHalfAlt } from "react-icons/fa";
 import Navbar from "../Homepage/Navbar";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { Filter } from "lucide-react";
 import Footer from "../Homepage/Footer";
-import axios, { AxiosError } from "axios"; // Import AxiosError
+import axios, { AxiosError } from "axios";
 import toast, { Toaster } from "react-hot-toast";
 import { useCart } from "../context/CartContext";
+import { Link } from "react-router-dom";
 
 interface Product {
   productId: number;
@@ -25,7 +26,7 @@ interface Product {
 }
 
 const ProductLayout = () => {
-  const { addToCart } = useCart();
+  const { addToCart, isInCart } = useCart();
   const [searchTerm, setSearchTerm] = useState("");
   const [products, setProducts] = useState<Product[]>([]);
   const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
@@ -43,10 +44,10 @@ const ProductLayout = () => {
   const currentProducts = filteredProducts.slice(indexOfFirstProduct, indexOfLastProduct);
   const totalPages = Math.ceil(filteredProducts.length / productsPerPage);
 
-  const handleGetAllProducts = async () => {
+  const handleGetAllProducts = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await axios.get("http://localhost:8080/app/product/all");
+      const res = await axios.get(`${import.meta.env.REACT_APP_API_URL || 'http://localhost:8080'}/app/product/all`);
       const productsWithRatings = res.data.map((product: Product) => ({
         ...product,
         rating: Math.random() * 2 + 3, // Random rating between 3-5
@@ -56,7 +57,7 @@ const ProductLayout = () => {
       setFilteredProducts(productsWithRatings);
     } catch (error) {
       console.error("Error fetching products:", error);
-      if (axios.isAxiosError(error)) { // Check if it's an Axios error
+      if (axios.isAxiosError(error)) {
         toast.error(`Failed to load products: ${error.response?.data?.message || error.message}`);
       } else {
         toast.error("Failed to load products: An unknown error occurred");
@@ -64,76 +65,76 @@ const ProductLayout = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const term = e.target.value.toLowerCase();
-    setSearchTerm(term);
-    filterProducts(term, selectedCategory, priceRange);
-    setCurrentPage(1);
-  };
-
-  const filterProducts = (
+  const filterProducts = useCallback((
     term: string,
     category: string | null,
     range: [number, number]
   ) => {
     const filtered = products.filter(
       (product) =>
-        (product.brand.toLowerCase().includes(term) ||
-          product.name.toLowerCase().includes(term) ||
-          product.category.toLowerCase().includes(term)) &&
+        (product.brand.toLowerCase().includes(term.toLowerCase()) ||
+          product.name.toLowerCase().includes(term.toLowerCase()) ||
+          product.category.toLowerCase().includes(term.toLowerCase())) &&
         (category ? product.category === category : true) &&
         (product.price >= range[0] && product.price <= range[1])
     );
     setFilteredProducts(filtered);
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [products]);
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const term = e.target.value;
+    setSearchTerm(term);
+    filterProducts(term, selectedCategory, priceRange);
   };
 
   const handleCategoryFilter = (category: string | null) => {
     setSelectedCategory(category);
     filterProducts(searchTerm, category, priceRange);
-    setCurrentPage(1);
   };
 
   const handlePriceFilter = (min: number, max: number) => {
     setPriceRange([min, max]);
     filterProducts(searchTerm, selectedCategory, [min, max]);
-    setCurrentPage(1);
   };
 
   const handleAddToCart = async (product: Product) => {
     if (product.quantity <= 0) {
-      toast.error("Product is out of stock!");
+      toast.error("Sản phẩm đã hết hàng!");
+      return;
+    }
+    
+    if (isInCart(product.productId)) {
+      toast.error("Sản phẩm đã có trong giỏ hàng");
       return;
     }
     try {
       await addToCart({
-        cartItemId: 0, // Add default cartItemId that will be set by backend
         productId: product.productId,
         name: product.name,
         price: product.price,
         quantity: 1,
-        image: product.images[0] || ''
+        image: product.images[0] || '/placeholder-product.jpg',
+        cartItemId: product.productId // Add cartItemId field
       });
-      toast.success(`${product.name} added to cart successfully!`); // Thông báo thành công
+      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
     } catch (error) {
       console.error("Error adding to cart:", error);
-      // Kiểm tra xem error có phải là AxiosError không để lấy thông tin chi tiết hơn
       if (axios.isAxiosError(error)) {
-        const axiosError = error as AxiosError<{ message?: string; error?: string; status?: number }>; // Type assertion
-        // Ưu tiên message từ response data, sau đó là error message chung
-        const errorMessage = axiosError.response?.data?.message || axiosError.response?.data?.error || axiosError.message;
-        const errorCode = axiosError.response?.status || 'N/A';
-        toast.error(`Failed to add product to cart. Error ${errorCode}: ${errorMessage}`);
+        const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
+        const errorCode = error.response?.status || 'N/A';
+        toast.error(`Lỗi ${errorCode}: ${errorMessage}`);
       } else if (error instanceof Error) {
-        toast.error(`Failed to add product to cart: ${error.message}`);
+        toast.error(`Lỗi: ${error.message}`);
       } else {
-        toast.error("Failed to add product to cart: An unknown error occurred.");
+        toast.error("Lỗi không xác định khi thêm vào giỏ hàng");
       }
     }
   };
 
-  const renderStars = (rating: number) => {
+  const renderStars = (rating: number = 0) => {
     const stars = [];
     const fullStars = Math.floor(rating);
     const hasHalfStar = rating % 1 >= 0.5;
@@ -153,27 +154,26 @@ const ProductLayout = () => {
 
   useEffect(() => {
     handleGetAllProducts();
-  }, []);
+  }, [handleGetAllProducts]);
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />
       <div className="h-10">
-      <Toaster
-          position="top-center" // Vị trí hiển thị toast (tùy chọn)
-          reverseOrder={false}  // Thứ tự hiển thị (tùy chọn)
-          toastOptions={{ // Tùy chỉnh chung cho toast (tùy chọn)
-            duration: 3000, // Thời gian hiển thị mặc định là 3 giây
+        <Toaster
+          position="top-center"
+          reverseOrder={false}
+          toastOptions={{
+            duration: 3000,
             style: {
               background: '#363636',
               color: '#fff',
             },
             success: {
               duration: 3000,
-             
             },
             error: {
-              duration: 3000, // Lỗi hiển thị lâu hơn
+              duration: 3000,
             }
           }}
         />
@@ -181,17 +181,16 @@ const ProductLayout = () => {
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-16">
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-green-600 to-green-400 rounded-xl p-8 mb-8 text-white">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Premium Soccer Gear</h1>
-          <p className="text-lg mb-6">Shop the latest equipment from top brands</p>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">Sản phẩm bóng đá cao cấp</h1>
+          <p className="text-lg mb-6">Các sản phẩm chất lượng từ các thương hiệu hàng đầu</p>
           <div className="relative w-full md:w-1/2">
             <input
               type="text"
-              placeholder="Search jerseys, cleats, balls..."
+              placeholder="Tìm kiếm áo đấu, giày, bóng..."
               value={searchTerm}
               onChange={handleSearch}
               className="w-full px-4 py-3 pl-10 border-0 rounded-lg focus:ring-2 focus:ring-white focus:outline-none text-gray-900"
             />
-
           </div>
         </div>
 
@@ -202,7 +201,7 @@ const ProductLayout = () => {
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Filter size={18} />
-            <span>Filters</span>
+            <span>Bộ lọc</span>
           </button>
 
           <div className="flex gap-2 flex-wrap">
@@ -214,7 +213,7 @@ const ProductLayout = () => {
               }`}
               onClick={() => handleCategoryFilter(null)}
             >
-              All
+              Tất cả
             </button>
             {Array.from(new Set(products.map(p => p.category))).map(category => (
               <button
@@ -234,7 +233,7 @@ const ProductLayout = () => {
 
         {showFilters && (
           <div className="bg-white p-4 rounded-lg shadow-md mb-6">
-            <h3 className="font-medium mb-3">Price Range</h3>
+            <h3 className="font-medium mb-3">Khoảng giá</h3>
             <div className="flex items-center gap-4">
               <input
                 type="range"
@@ -264,48 +263,42 @@ const ProductLayout = () => {
                       key={product.productId}
                       className="bg-white rounded-xl shadow-sm overflow-hidden hover:shadow-md transition-all duration-300 group relative"
                     >
-
-                      <div className="relative h-48 overflow-hidden">
-                        {product.images && product.images.length > 0 ? (
-                          <img
-                            src={product.images[0]}
-                            alt={product.name}
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          />
-                        ) : (
-                          <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                            <span className="text-gray-400">No image available</span>
-                          </div>
-                        )}
-
-                        <button
-                          onClick={() => handleAddToCart(product)}
-                          className="absolute bottom-0 left-0 right-0 bg-green-600 text-white py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 hover:bg-green-700 text-sm font-medium"
-                        >
-                          ADD TO CART
-                        </button>
-                      </div>
+                      <Link to={`/product/${product.productId}`} className="block">
+                        <div className="relative h-48 overflow-hidden">
+                          {product.images && product.images.length > 0 ? (
+                            <img
+                              src={product.images[0]}
+                              alt={product.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = '/placeholder-product.jpg';
+                              }}
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-gray-100 flex items-center justify-center">
+                              <span className="text-gray-400">Không có hình ảnh</span>
+                            </div>
+                          )}
+                        </div>
+                      </Link>
 
                       <div className="p-4">
-                        <div className="flex justify-between items-start mb-1">
+                        <Link to={`/product/${product.productId}`} className="block">
                           <h3 className="text-lg font-semibold text-gray-900 line-clamp-1 hover:text-green-600 transition-colors">
                             {product.name}
                           </h3>
-
-                        </div>
+                        </Link>
                         <div className="text-lg font-bold text-green-600 whitespace-nowrap">
-                          ${product.price.toFixed(2)}
+                          ₫{product.price.toLocaleString()}
                         </div>
                         <p className="text-sm text-gray-600 mb-2">{product.brand}</p>
 
-                        {product.rating && (
-                          <div className="flex items-center gap-1 mb-2">
-                            {renderStars(product.rating)}
-                            <span className="text-xs text-gray-500 ml-1">
-                              ({product.reviews})
-                            </span>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-1 mb-2">
+                          {renderStars(product.rating)}
+                          <span className="text-xs text-gray-500 ml-1">
+                            ({product.reviews} đánh giá)
+                          </span>
+                        </div>
 
                         <div className="flex justify-between items-center mt-3">
                           <span className={`px-2 py-1 rounded-full text-xs ${
@@ -315,14 +308,22 @@ const ProductLayout = () => {
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-red-100 text-red-800'
                           }`}>
-                            {product.quantity > 0 ? `${product.quantity} in stock` : 'Out of stock'}
+                            {product.quantity > 0 ? `Còn ${product.quantity} sản phẩm` : 'Hết hàng'}
                           </span>
-                          {/* Nút giỏ hàng nhỏ này có thể không cần thiết nếu đã có nút "ADD TO CART" lớn hơn khi hover */}
-                          {/* <button className="p-1.5 bg-green-50 rounded-full text-green-600 hover:bg-green-100 transition-colors">
-                            <FiShoppingCart className="w-4 h-4" />
-                          </button> */}
                         </div>
                       </div>
+
+                      <button
+                        onClick={() => handleAddToCart(product)}
+                        disabled={product.quantity <= 0 || isInCart(product.productId)}
+                        className={`absolute bottom-0 left-0 right-0 py-2 opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-sm font-medium ${
+                          product.quantity <= 0 || isInCart(product.productId)
+                            ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            : 'bg-green-600 text-white hover:bg-green-700'
+                        }`}
+                      >
+                        {isInCart(product.productId) ? 'ĐÃ THÊM VÀO GIỎ' : 'THÊM VÀO GIỎ'}
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -393,20 +394,18 @@ const ProductLayout = () => {
               </>
             ) : (
               <div className="bg-white rounded-xl p-12 text-center">
-                <h3 className="text-xl font-medium text-gray-700 mb-2">No products found</h3>
-                <p className="text-gray-500 mb-4">Try adjusting your search or filter criteria</p>
+                <h3 className="text-xl font-medium text-gray-700 mb-2">Không tìm thấy sản phẩm</h3>
+                <p className="text-gray-500 mb-4">Hãy thử điều chỉnh từ khóa tìm kiếm hoặc bộ lọc</p>
                 <button
                   onClick={() => {
                     setSearchTerm('');
                     setSelectedCategory(null);
                     setPriceRange([0, 1000]);
-                    // Reset về danh sách sản phẩm ban đầu, không phải filteredProducts có thể đang rỗng
                     setFilteredProducts(products);
-                    setCurrentPage(1); // Reset về trang đầu tiên
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  Reset Filters
+                  Đặt lại bộ lọc
                 </button>
               </div>
             )}
