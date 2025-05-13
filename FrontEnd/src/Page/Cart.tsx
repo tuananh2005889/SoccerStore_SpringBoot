@@ -61,8 +61,8 @@ const Cart: React.FC = () => {
         <Navbar />
         <div className="h-16" />
         <div className="text-center py-16">
-          <h2 className="text-3xl font-bold text-gray-900 mb-4">Giỏ hàng của bạn trống</h2>
-          <p className="text-gray-600 mb-8">Bạn chưa thêm sản phẩm nào vào giỏ.</p>
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">Your cart is empty</h2>
+          <p className="text-gray-600 mb-8">You haven't added any products to your cart.</p>
           <Link
             to="/product"
             className="px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
@@ -80,7 +80,7 @@ const Cart: React.FC = () => {
       <Navbar />
       <div className="h-16" />
       <div className="max-w-7xl mx-auto px-4 py-16">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Giỏ hàng của tôi</h1>
+        <h1 className="text-3xl font-bold text-gray-900 mb-8">My cart</h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Danh sách sản phẩm trong giỏ */}
@@ -158,7 +158,7 @@ const Cart: React.FC = () => {
 
           {/* Tổng kết đơn hàng */}
           <div className="bg-white rounded-lg shadow-sm p-6 h-fit sticky top-6">
-            <h2 className="text-lg font-medium text-gray-900 mb-4">Tóm tắt đơn hàng</h2>
+            <h2 className="text-lg font-medium text-gray-900 mb-4">Order summary</h2>
             <div className="space-y-4">
               <div className="flex justify-between">
                 <span className="text-gray-600">Number of items</span>
@@ -179,7 +179,7 @@ const Cart: React.FC = () => {
             </div>
             <div className="mt-6 space-y-2">
               <button
-                onClick={() => toast.success('Thanh toán sắp ra mắt!')}
+                onClick={() => toast.success('Checkout coming soon!')}
                 className="w-full bg-green-600 text-white py-3 rounded-md hover:bg-green-700 transition-colors"
               >
                 Checkout

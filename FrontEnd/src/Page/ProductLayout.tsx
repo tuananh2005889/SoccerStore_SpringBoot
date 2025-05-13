@@ -102,12 +102,12 @@ const ProductLayout = () => {
 
   const handleAddToCart = async (product: Product) => {
     if (product.quantity <= 0) {
-      toast.error("Sản phẩm đã hết hàng!");
+      toast.error("Product is out of stock!");
       return;
     }
     
     if (isInCart(product.productId)) {
-      toast.error("Sản phẩm đã có trong giỏ hàng");
+      toast.error("Product is already in cart!");
       return;
     }
     try {
@@ -119,17 +119,17 @@ const ProductLayout = () => {
         image: product.images[0] || '/placeholder-product.jpg',
         cartItemId: product.productId // Add cartItemId field
       });
-      toast.success(`Đã thêm ${product.name} vào giỏ hàng!`);
+      toast.success(`Added ${product.name} to cart!`);
     } catch (error) {
       console.error("Error adding to cart:", error);
       if (axios.isAxiosError(error)) {
         const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message;
         const errorCode = error.response?.status || 'N/A';
-        toast.error(`Lỗi ${errorCode}: ${errorMessage}`);
+        toast.error(`Error ${errorCode}: ${errorMessage}`);
       } else if (error instanceof Error) {
-        toast.error(`Lỗi: ${error.message}`);
+        toast.error(`Error: ${error.message}`);
       } else {
-        toast.error("Lỗi không xác định khi thêm vào giỏ hàng");
+        toast.error("Unknown error when adding to cart");
       }
     }
   };
@@ -181,12 +181,12 @@ const ProductLayout = () => {
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-16">
         {/* Hero Section */}
         <div className="bg-gradient-to-r from-green-600 to-green-400 rounded-xl p-8 mb-8 text-white">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Sản phẩm bóng đá cao cấp</h1>
-          <p className="text-lg mb-6">Các sản phẩm chất lượng từ các thương hiệu hàng đầu</p>
+          <h1 className="text-3xl md:text-4xl font-bold mb-2">High quality football products</h1>
+          <p className="text-lg mb-6">Quality products from leading brands</p>
           <div className="relative w-full md:w-1/2">
             <input
               type="text"
-              placeholder="Tìm kiếm áo đấu, giày, bóng..."
+              placeholder="Search..."
               value={searchTerm}
               onChange={handleSearch}
               className="w-full px-4 py-3 pl-10 border-0 rounded-lg focus:ring-2 focus:ring-white focus:outline-none text-gray-900"
@@ -201,7 +201,7 @@ const ProductLayout = () => {
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             <Filter size={18} />
-            <span>Bộ lọc</span>
+            <span>Filter</span>
           </button>
 
           <div className="flex gap-2 flex-wrap">
@@ -213,7 +213,7 @@ const ProductLayout = () => {
               }`}
               onClick={() => handleCategoryFilter(null)}
             >
-              Tất cả
+              All
             </button>
             {Array.from(new Set(products.map(p => p.category))).map(category => (
               <button
@@ -276,7 +276,7 @@ const ProductLayout = () => {
                             />
                           ) : (
                             <div className="w-full h-full bg-gray-100 flex items-center justify-center">
-                              <span className="text-gray-400">Không có hình ảnh</span>
+                              <span className="text-gray-400">No image</span>
                             </div>
                           )}
                         </div>
@@ -289,7 +289,7 @@ const ProductLayout = () => {
                           </h3>
                         </Link>
                         <div className="text-lg font-bold text-green-600 whitespace-nowrap">
-                          ₫{product.price.toLocaleString()}
+                          ${product.price.toLocaleString()}
                         </div>
                         <p className="text-sm text-gray-600 mb-2">{product.brand}</p>
 
@@ -308,7 +308,7 @@ const ProductLayout = () => {
                                 ? 'bg-yellow-100 text-yellow-800'
                                 : 'bg-red-100 text-red-800'
                           }`}>
-                            {product.quantity > 0 ? `Còn ${product.quantity} sản phẩm` : 'Hết hàng'}
+                            {product.quantity > 0 ? `In stock ${product.quantity}` : 'Out of stock'}
                           </span>
                         </div>
                       </div>
@@ -322,7 +322,7 @@ const ProductLayout = () => {
                             : 'bg-green-600 text-white hover:bg-green-700'
                         }`}
                       >
-                        {isInCart(product.productId) ? 'ĐÃ THÊM VÀO GIỎ' : 'THÊM VÀO GIỎ'}
+                        {isInCart(product.productId) ? 'Added to cart' : 'Add to cart'}
                       </button>
                     </div>
                   ))}
@@ -405,7 +405,7 @@ const ProductLayout = () => {
                   }}
                   className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
-                  Đặt lại bộ lọc
+                  Reset filter
                 </button>
               </div>
             )}
