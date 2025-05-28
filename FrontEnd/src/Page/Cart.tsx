@@ -6,15 +6,16 @@ import { FiTrash2, FiMinus, FiPlus } from 'react-icons/fi';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
-
 const Cart: React.FC = () => {
-  const {
-    cartItems,
-    removeFromCart,
-    clearCart,
-    loading,
-  } = useCart();
+  const { cartItems, removeFromCart,updateQuantity ,clearCart, loading } = useCart();
 
+  useEffect(() => {
+    const username = localStorage.getItem('username');
+    if (!username) {
+      toast.error('Please login to view cart');
+      window.location.href = '/login';
+    }
+  }, []);
 
   const [localQuantities, setLocalQuantities] = useState<Record<number, number>>({});
 
@@ -26,19 +27,38 @@ const Cart: React.FC = () => {
     setLocalQuantities(qtys);
   }, [cartItems]);
 
-  // Handlers for local quantity change
-  const changeLocalQuantity = (productId: number, delta: number) => {
+  // quantity change
+  useEffect(() => {
+    const qtys: Record<number, number> = {};
+    cartItems.forEach(item => {
+      qtys[item.productId] = item.quantity;
+    });
+    setLocalQuantities(qtys);
+  }, [cartItems]);
+
+  const changeLocalQuantity = async (productId: number, delta: number) => {
     setLocalQuantities(prev => {
       const current = prev[productId] || 0;
       const updated = Math.max(current + delta, 1);
       return { ...prev, [productId]: updated };
     });
-  };
 
+
+    try {
+      const current = localQuantities[productId] || 0;
+      const updated = Math.max(current + delta, 1);
+      await updateQuantity(productId, updated);
+    } catch (error) {
+      console.error('Error updating quantity:', error);
+      toast.error('Quantity not updating');
+      // Hoàn nguyên số lượng nếu lỗi
+      setLocalQuantities(prev => ({ ...prev, [productId]: cartItems.find(item => item.productId === productId)?.quantity || 1 }));
+    }
+  };
   // Derived totals based on local quantities
   const totalItems = Object.values(localQuantities).reduce((sum, q) => sum + q, 0);
   const totalPrice = cartItems.reduce((sum, item) => {
-    const q = localQuantities[item.productId] || 0;
+  const q = localQuantities[item.productId] || 0;
     return sum + q * item.price;
   }, 0);
 
@@ -114,7 +134,7 @@ const Cart: React.FC = () => {
                   <p className="mt-2 text-gray-700 text-xl font-bold">Giá: ${item.price.toLocaleString()}</p>
 
                   <div className="mt-4 flex items-center justify-between">
-                    {/* Nút tăng/giảm số lượng */}
+                    {/*tăng/giảm  */}
                     <div className="flex items-center">
                       <button
                         onClick={() => changeLocalQuantity(item.productId, -1)}
@@ -137,7 +157,7 @@ const Cart: React.FC = () => {
                       </button>
                     </div>
 
-                    {/* Tổng giá từng dòng */}
+                    {/* Tổng giá  */}
                     <div className="flex items-center">
                       <span className="text-lg font-medium text-gray-900 mr-4">
                         ${((item.price * (localQuantities[item.productId] || 0))).toLocaleString()}
@@ -145,7 +165,7 @@ const Cart: React.FC = () => {
                       <button
                         onClick={() => removeFromCart(item.productId)}
                         className="text-gray-400 hover:text-red-500 transition-colors"
-                        aria-label="Xóa sản phẩm"
+                        aria-label="Remove product"
                       >
                         <FiTrash2 size={20} />
                       </button>

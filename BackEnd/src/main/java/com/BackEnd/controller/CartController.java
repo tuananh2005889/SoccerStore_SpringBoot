@@ -136,4 +136,24 @@ public class CartController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
         }
     }
+
+    @PutMapping("/update")
+    public ResponseEntity<CartItemDTO> updateItemQuantity(
+            @RequestBody UpdateCartItemRequest request) {
+        try {
+            CartItemDTO dto = cartService.updateItemQuantity(request.getCartId(), request.getProductId(),
+                    request.getQuantity());
+            return ResponseEntity.ok(dto);
+        } catch (IllegalArgumentException ex) {
+            log.warn("Invalid update quantity request: {}", request, ex);
+            return ResponseEntity.badRequest().build();
+        } catch (RuntimeException ex) {
+            log.warn("Failed to update quantity for product {} in cart {}", request.getProductId(), request.getCartId(),
+                    ex);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).build();
+        } catch (Exception ex) {
+            log.error("Error updating item quantity", ex);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
 }

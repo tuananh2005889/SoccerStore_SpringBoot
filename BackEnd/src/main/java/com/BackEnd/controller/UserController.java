@@ -6,6 +6,7 @@ import com.BackEnd.dto.ForgotPasswordRequest;
 import com.BackEnd.dto.ResetPasswordRequest;
 import com.BackEnd.dto.UpdateUserInfoRequest;
 import com.BackEnd.service.UserService;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -76,8 +77,14 @@ public class UserController {
     }
 
     @PutMapping("/update-info")
-    public ResponseEntity<UserDTO> updateInfo(@RequestBody UpdateUserInfoRequest dto) {
-        UserDTO updated = userService.updateUserInfo(dto);
-        return ResponseEntity.ok(updated);
+    public ResponseEntity<?> updateInfo(@RequestBody UpdateUserInfoRequest dto) {
+        try {
+
+            UserDTO updated = userService.updateUserInfo(dto);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(e.getMessage());
+        }
     }
 }

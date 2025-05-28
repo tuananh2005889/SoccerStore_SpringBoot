@@ -117,7 +117,7 @@ const ProductLayout = () => {
         price: product.price,
         quantity: 1,
         image: product.images[0] || '/placeholder-product.jpg',
-        cartItemId: product.productId // Add cartItemId field
+        cartItemId: product.productId 
       });
       toast.success(`Added ${product.name} to cart!`);
     } catch (error) {
@@ -160,26 +160,8 @@ const ProductLayout = () => {
     <div className="min-h-screen flex flex-col bg-gray-50">
       <Navbar />
       <div className="h-10">
-        <Toaster
-          position="top-center"
-          reverseOrder={false}
-          toastOptions={{
-            duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
-            },
-            success: {
-              duration: 3000,
-            },
-            error: {
-              duration: 3000,
-            }
-          }}
-        />
       </div>
       <main className="flex-grow max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mt-16">
-        {/* Hero Section */}
         <div className="bg-gradient-to-r from-green-600 to-green-400 rounded-xl p-8 mb-8 text-white">
           <h1 className="text-3xl md:text-4xl font-bold mb-2">High quality football products</h1>
           <p className="text-lg mb-6">Quality products from leading brands</p>

@@ -12,6 +12,8 @@ import com.BackEnd.repository.CartRepository;
 import com.BackEnd.repository.ProductRepository;
 import com.BackEnd.repository.UserRepository;
 import com.BackEnd.utils.DTOConverter;
+
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -30,12 +32,9 @@ public class CartService {
     private final ProductRepository productRepo;
     private final UserRepository userRepo;
 
-    /**
-     * Tạo hoặc lấy cart ACTIVE cho user
-     */
     public CartBasicInfoDTO getOrCreateActiveCartDTO(String userName) {
         User user = userRepo.findByUserName(userName)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userName));
+                .orElseThrow(() -> new RuntimeException("Not found user: " + userName));
         Cart cart = cartRepo.findCartByUserAndStatus(user, Cart.CartStatus.ACTIVE)
                 .orElseGet(() -> {
                     Cart newCart = new Cart();
@@ -53,11 +52,9 @@ public class CartService {
         Cart cart = cartRepo.findById(req.getCartId())
                 .orElseThrow(() -> new RuntimeException("Cart not found: " + req.getCartId()));
         Product product = productRepo.findByProductId(req.getProductId())
-                .orElseThrow(() -> new RuntimeException("Product not found: " + req.getProductId()));
+                .orElseThrow(() -> new RuntimeException("Prodcut not found: " + req.getProductId()));
 
-        CartItem item = cart.getCartItems().stream()
-                .filter(ci -> ci.getProduct().getProductId().equals(req.getProductId()))
-                .findFirst()
+        CartItem item = cartItemRepo.findByCartIdAndProductId(req.getCartId(), req.getProductId())
                 .map(existing -> {
                     existing.setQuantity(existing.getQuantity() + req.getQuantity());
                     return cartItemRepo.save(existing);
@@ -73,23 +70,23 @@ public class CartService {
         return DTOConverter.toCartItemDTO(item);
     }
 
-    /**
-     * Xóa 1 item khỏi cart
-     */
+    @Transactional
     public void removeItemFromCart(Long cartId, Long productId) {
         Cart cart = cartRepo.findById(cartId)
-                .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
-        CartItem item = cart.getCartItems().stream()
-                .filter(ci -> ci.getProduct().getProductId().equals(productId))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Cart item not found for product: " + productId));
-        cartItemRepo.delete(item);
+                .orElseThrow(() -> new RuntimeException("Cart not found" + cartId));
+        CartItem item = cartItemRepo.findByCartIdAndProductId(cartId, productId)
+                .orElseThrow(() -> new RuntimeException("No products found in cart: " + productId));
         cart.getCartItems().remove(item);
+        cartItemRepo.delete(item);
+        cartRepo.save(cart);
     }
 
-    /**
-     * Xóa hết items trong cart
-     */
+    @Transactional
+    public void removeAllItemsByProductId(Long productId) {
+        cartItemRepo.deleteByProductId(productId);
+    }
+
+    @Transactional
     public void clearCart(Long cartId) {
         Cart cart = cartRepo.findById(cartId)
                 .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
@@ -98,9 +95,7 @@ public class CartService {
         cartRepo.save(cart);
     }
 
-    /**
-     * Thanh toán cart: chuyển sang trạng thái PAID
-     */
+    @Transactional
     public void checkoutCart(Long cartId) {
         Cart cart = cartRepo.findById(cartId)
                 .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
@@ -108,23 +103,16 @@ public class CartService {
         cartRepo.save(cart);
     }
 
-    /**
-     * Lấy thông tin trạng thái của cart
-     */
     public Cart getCartStatus(Long cartId) {
         return cartRepo.findById(cartId)
                 .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
     }
 
-    /**
-     * Lấy danh sách URL ảnh theo CartItems
-     */
     public List<String> getImageUrlPerCartItem(Long cartId) {
         List<String> urls = cartRepo.findImageUrlPerCartItem(cartId);
         return urls != null ? urls : Collections.emptyList();
     }
 
-    // src/main/java/com/BackEnd/service/CartService.java
     public List<CartItemDTO> getCartItemsInActiveCart(Long cartId) {
         Cart cart = cartRepo.findById(cartId)
                 .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
@@ -132,10 +120,7 @@ public class CartService {
         return cart.getCartItems().stream()
                 .map(ci -> {
                     Product p = ci.getProduct();
-                    // lấy ảnh đầu tiên
-                    String img = p.getImages().isEmpty()
-                            ? ""
-                            : p.getImages().get(0);
+                    String img = p.getImages().isEmpty() ? "" : p.getImages().get(0);
                     return new CartItemDTO(
                             ci.getCartItemId(),
                             p.getProductId(),
@@ -149,4 +134,35 @@ public class CartService {
                 .collect(Collectors.toList());
     }
 
+    @Transactional
+    public CartItemDTO updateItemQuantity(Long cartId, Long productId, int quantity) {
+        if (quantity < 1) {
+            throw new IllegalArgumentException("Quantity must be greater than 1");
+        }
+
+        Cart cart = cartRepo.findById(cartId)
+                .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
+
+        CartItem cartItem = cartItemRepo.findByCartIdAndProductId(cartId, productId)
+                .orElseThrow(() -> new RuntimeException("No product fount in cart: " + productId));
+
+        cartItem.setQuantity(quantity);
+        cartItemRepo.save(cartItem);
+
+        return convertToCartItemDTO(cartItem);
+    }
+
+    private CartItemDTO convertToCartItemDTO(CartItem cartItem) {
+        Product p = cartItem.getProduct();
+        String img = p.getImages().isEmpty() ? "" : p.getImages().get(0);
+        return new CartItemDTO(
+                cartItem.getCartItemId(),
+                p.getProductId(),
+                p.getName(),
+                p.getPrice(),
+                img,
+                p.getBrand(),
+                p.getDescription(),
+                cartItem.getQuantity());
+    }
 }
