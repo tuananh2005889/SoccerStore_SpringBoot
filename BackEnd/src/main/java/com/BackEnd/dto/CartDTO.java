@@ -15,5 +15,4 @@ public class CartDTO {
     private List<CartItemDTO> cartItems;
     private String status;
 
-
 }

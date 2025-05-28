@@ -104,20 +104,16 @@ public class UserService {
                 .orElse(false);
     }
 
-    @Transactional
     public UserDTO updateUserInfo(UpdateUserInfoRequest dto) {
-        User u = userRepo.findByUserName(dto.getUserName())
-                .orElseThrow(() -> new RuntimeException("User not found: " + dto.getUserName()));
+        User user = userRepo.findByUserName(dto.getUserName())
+                .orElseThrow(() -> new RuntimeException("User not found"));
 
-        u.setFullName(dto.getFullName());
-        u.setGmail(dto.getGmail());
-        // nếu password không rỗng thì cập nhật
-        if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
-            u.setPassword(dto.getPassword());
-        }
-        u.setPhone(dto.getPhone());
-        u.setAddress(dto.getAddress());
-        User saved = userRepo.save(u);
-        return toDto(saved);
+        user.setFullName(dto.getFullName());
+        user.setGmail(dto.getGmail());
+        user.setPhone(dto.getPhone());
+        user.setAddress(dto.getAddress());
+
+        User updatedUser = userRepo.save(user);
+        return toDto(updatedUser);
     }
 }

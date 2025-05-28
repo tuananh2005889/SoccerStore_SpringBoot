@@ -1,3 +1,6 @@
+import React from 'react';
+import { Toaster } from 'react-hot-toast';
+import { UserProvider } from './context/UserContext';
 import AdminBrandLayout from "./_admin/AdminBrandLayout"
 import { Routes, Route } from "react-router-dom";
 import { AuthProvider } from './context/AuthContext';
@@ -9,23 +12,24 @@ import Cart from "./Page/Cart";
 import Profile from "./Page/Profile";
 import Login from "./Login/Login";
 
-function App() {
-
+const App: React.FC = () => {
   return (
-    <AuthProvider>
-      <CartProvider>
-        <Routes>
-          <Route path="/admin" element={<AdminBrandLayout />} />
-          <Route path="/login" element={<Login/>}/>
-          <Route path="/product" element={<ProductLayout/>}/>
+    <UserProvider>
+      <Toaster position="top-right" />
+      <AuthProvider>
+        <CartProvider>
+          <Routes>
+            <Route path="/admin" element={<AdminBrandLayout />} />
+            <Route path="/login" element={<Login/>}/>
+            <Route path="/product" element={<ProductLayout/>}/>
+            <Route path="/cart" element={<Cart/>}/>
+            <Route path="/Profile" element={<Profile/>}/>
+            <Route path="/" element={<HomePage/>}/>
+          </Routes>
+        </CartProvider>
+      </AuthProvider>
+    </UserProvider>
+  );
+};
 
-          <Route path="/cart" element={<Cart/>}/>
-          <Route path="/Profile" element={<Profile/>}/>
-          <Route path="/" element={<HomePage/>}/>
-        </Routes>
-      </CartProvider>
-    </AuthProvider>
-  )
-}
-
-export default App
+export default App;

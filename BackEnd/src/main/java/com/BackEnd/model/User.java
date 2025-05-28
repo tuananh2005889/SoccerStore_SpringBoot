@@ -32,7 +32,7 @@ public class User {
     @Column(name = "full_name", nullable = false, length = 255)
     private String fullName;
 
-    @Column(name = "gmail", nullable = false, length = 255, unique = true)
+    @Column(nullable = false, unique = true)
     private String gmail;
 
     @Column(length = 50)

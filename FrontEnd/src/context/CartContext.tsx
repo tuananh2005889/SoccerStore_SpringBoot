@@ -140,42 +140,13 @@ export function CartProvider({ children }: { children: ReactNode }) {
         quantity:  product.quantity || 1,
       });
       await fetchCartItems();
-      toast.success('Added to cart');
+      // toast.success('Added to cart');
     } catch (e) {
       console.error('addToCart error:', e);
       toast.error('Failed to add to cart');
     }
   };
 
-  const removeFromCart = async (productId: number): Promise<void> => {
-    if (!cartId) {
-      toast.error('Cart not initialized');
-      return;
-    }
-    try {
-      await api.delete('/app/cart/remove', { params: { cartId, productId } });
-      await fetchCartItems();
-      toast.success('Removed from cart');
-    } catch (e) {
-      console.error('removeFromCart error:', e);
-      toast.error('Failed to remove item');
-    }
-  };
-
-  const updateQuantity = async (productId: number, quantity: number): Promise<void> => {
-    if (!cartId || quantity < 1) {
-      toast.error('Invalid quantity');
-      return;
-    }
-    try {
-      await api.put('/app/cart/update', { cartId, productId, quantity });
-      await fetchCartItems();
-      toast.success('Quantity updated');
-    } catch (e) {
-      console.error('updateQuantity error:', e);
-      toast.error('Failed to update quantity');
-    }
-  };
 
   const clearCart = async (): Promise<void> => {
     if (!cartId) {
@@ -195,6 +166,36 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const totalItems = cartItems.reduce((sum, it) => sum + it.quantity, 0);
   const totalPrice = cartItems.reduce((sum, it) => sum + it.quantity * it.price, 0);
 
+
+  const removeFromCart = async (productId: number): Promise<void> => {
+    if (!cartId) {
+      toast.error('Giỏ hàng chưa được khởi tạo');
+      return;
+    }
+    try {
+      await api.delete('/app/cart/remove', { params: { cartId, productId } });
+      await fetchCartItems();
+      toast.success('Đã xóa sản phẩm khỏi giỏ hàng');
+    } catch (e: any) {
+      console.error('removeFromCart error:', e);
+      toast.error(e.response?.data?.message || 'Không thể xóa sản phẩm');
+    }
+  };
+  
+  const updateQuantity = async (productId: number, quantity: number): Promise<void> => {
+    if (!cartId || quantity < 1) {
+      toast.error('Số lượng không hợp lệ');
+      return;
+    }
+    try {
+      await api.put('/app/cart/update', { cartId, productId, quantity });
+      await fetchCartItems();
+      toast.success('Đã cập nhật số lượng');
+    } catch (e: any) {
+      console.error('updateQuantity error:', e);
+      toast.error(e.response?.data?.message || 'Không thể cập nhật số lượng');
+    }
+  };
   return (
     <CartContext.Provider
       value={{
@@ -220,3 +221,5 @@ export function useCart(): CartContextType {
   if (!ctx) throw new Error('useCart must be used within CartProvider');
   return ctx;
 }
+
+
