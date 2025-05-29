@@ -3,7 +3,6 @@ package com.BackEnd.service;
 import com.BackEnd.dto.*;
 import com.BackEnd.model.*;
 import com.BackEnd.repository.*;
-import com.BackEnd.repository.OrderDetailRepository;
 import com.BackEnd.utils.DTOConverter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -27,73 +26,39 @@ public class OrderService {
     private final PaymentService paymentService;
     private final OrderRepository orderRepo;
     private final OrderDetailRepository orderDetailRepo;
+    private final CartRepository cartRepository;
 
-    public CreateOrderResponse createOrder(Long cartId) {
+    public CreateOrderResponse createOrder(Long cartId) throws Exception {
+        // 1. Đánh dấu giỏ hàng đã SUBMITTED
         cartService.changeCartStatus(cartId, Cart.CartStatus.SUBMITTED);
+        var cart = cartRepository.findById(cartId)
+                .orElseThrow(() -> new RuntimeException("Cart không tồn tại: " + cartId));
 
+        // 2. Lấy user và tổng tiền
         User user = cartService.getUserByCartId(cartId);
-        List<CartItem> cartItemList = cartService.getAllCartItemsInActiveCart(cartId);
-
-        List<OrderDetail> orderDetailList = cartItemList.stream()
-                .map(cartItem -> {
-                    Product product = cartItem.getProduct();
-                    if (product == null || product.getPrice() == null) {
-                        throw new IllegalArgumentException("CartItem contains invalid product or price");
-                    }
-                    int quantity = cartItem.getQuantity();
-                    double totalPrice = quantity * product.getPrice();
-                    return new OrderDetail(null, product, quantity, totalPrice);
-                })
-                .collect(Collectors.toList());
-
-        double cartTotalPrice = orderDetailList.stream()
-                .mapToDouble(OrderDetail::getTotalPrice)
-                .sum();
-
-        Long orderCode = 0L;
-        String qrCode = null;
-        int retry = 0;
-        boolean success = false;
-        while (!success && retry < 5) {
-            try {
-                orderCode = System.currentTimeMillis() + new Random().nextInt(9999);
-                PaymentRequest paymentRequest = new PaymentRequest(orderCode, (int) cartTotalPrice,
-                        "AutoParts Checkout");
-                qrCode = paymentService.createOrderInPayOS(paymentRequest);
-                success = true;
-
-                Order order = new Order();
-                order.setQrCodeToCheckout(qrCode);
-                order.setUser(user);
-                order.setStatus(Order.OrderStatus.PENDING);
-                order.setCreatedAt(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
-                order.setShippingAddress("test");
-                order.setOrderCode(orderCode);
-                order.setTotalPrice(cartTotalPrice);
-
-                for (OrderDetail od : orderDetailList) {
-                    od.setOrder(order);
-                }
-                order.setOrderDetails(orderDetailList);
-                orderRepo.save(order);
-
-            } catch (HttpClientErrorException e) {
-                if (e.getStatusCode() == HttpStatus.CONFLICT) {
-                    retry++;
-                    System.out.println("OrderCode is duplicate, please try again");
-                } else {
-                    throw e;
-                }
-            } catch (Exception e) {
-                throw new RuntimeException(e);
-            }
+        double amount = cartService.getCartTotalAmount(cartId);
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Giỏ rỗng hoặc tổng tiền <= 0");
         }
 
-        if (!success) {
-            throw new RuntimeException("Cannot create order because duplicate orderCode too much");
-        }
+        // 3. Sinh orderCode & tạo QR Base64
+        Long orderCode = System.currentTimeMillis() + new Random().nextInt(9999);
+        PaymentRequest payReq = new PaymentRequest(orderCode, (int) amount, "AutoParts Checkout");
+        String qrBase64 = paymentService.createOrderInPayOS(payReq);
 
-        return new CreateOrderResponse(qrCode, orderCode);
+        // 4. Lưu Order vào DB
+        Order order = new Order();
+        order.setCart(cart);
+        order.setUser(user);
+        order.setOrderCode(orderCode);
+        order.setQrCodeToCheckout(qrBase64);
+        order.setTotalPrice(amount);
+        order.setStatus(Order.OrderStatus.PENDING);
+        order.setCreatedAt(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+        orderRepo.save(order);
+
+        // 5. Trả về DTO chứa mã và QR
+        return new CreateOrderResponse(orderCode, qrBase64, amount);
     }
 
     public Boolean checkIfUserHasPendingOrder(String userName) {
@@ -123,8 +88,10 @@ public class OrderService {
     public void changeOrderStatus(Long orderCode, Order.OrderStatus status) {
         try {
             Order order = orderRepo.findByOrderCode(orderCode);
-            order.setStatus(status);
-            orderRepo.save(order);
+            if (order != null) {
+                order.setStatus(status);
+                orderRepo.save(order);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -152,4 +119,50 @@ public class OrderService {
         }).collect(Collectors.toList());
     }
 
+    @Transactional
+    public void processSuccessfulPayment(Long orderCode) {
+        try {
+            Order order = orderRepo.findByOrderCode(orderCode);
+            if (order == null) {
+                throw new RuntimeException("Order not found with orderCode: " + orderCode);
+            }
+
+            // Chỉ cập nhật nếu đơn hàng đang ở trạng thái PENDING
+            if (order.getStatus() == Order.OrderStatus.PENDING) {
+                order.setStatus(Order.OrderStatus.PAID);
+                order.setCreatedAt(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+                orderRepo.save(order);
+
+                // Cập nhật trạng thái giỏ hàng
+                Cart cart = order.getCart();
+                if (cart != null) {
+                    cart.setStatus(Cart.CartStatus.COMPLETED);
+                    cartRepository.save(cart);
+                }
+
+                System.out.println("Order " + orderCode + " has been successfully processed as PAID");
+            } else {
+                System.out.println("Order " + orderCode + " is already processed with status: " + order.getStatus());
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Error processing payment for order: " + orderCode, e);
+        }
+    }
+
+    // Phương thức để lấy thông tin đơn hàng theo orderCode
+    @Transactional(readOnly = true)
+    public OrderDTO getOrderByOrderCode(Long orderCode) {
+        Order order = orderRepo.findByOrderCode(orderCode);
+        if (order == null) {
+            throw new RuntimeException("Order not found with orderCode: " + orderCode);
+        }
+        return DTOConverter.toOrderDTO(order);
+    }
+
+    // Phương thức để kiểm tra xem đơn hàng có thể thanh toán không
+    public boolean canOrderBePaid(Long orderCode) {
+        Order order = orderRepo.findByOrderCode(orderCode);
+        return order != null && order.getStatus() == Order.OrderStatus.PENDING;
+    }
 }

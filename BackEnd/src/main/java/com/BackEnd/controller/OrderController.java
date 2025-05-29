@@ -3,50 +3,49 @@ package com.BackEnd.controller;
 import com.BackEnd.dto.CreateOrderResponse;
 import com.BackEnd.dto.OrderDTO;
 import com.BackEnd.dto.OrderDetailDTO;
-import com.BackEnd.dto.PaymentRequest;
-import com.BackEnd.model.Cart;
 import com.BackEnd.model.Order;
-import com.BackEnd.model.Payment;
-import com.BackEnd.model.User;
-import com.BackEnd.service.CartService;
 import com.BackEnd.service.OrderService;
 import com.BackEnd.service.PaymentService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.client.RestTemplate;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 @RestController
 @RequestMapping("/app/order")
-@RequiredArgsConstructor // giup DI, khong can tao constructor
+@RequiredArgsConstructor
 public class OrderController {
     private final OrderService orderService;
     private final PaymentService paymentService;
-    private final CartService cartService;
-    private final RestTemplate restTemplate = new RestTemplate();
-
-    @Value("${PAYOS_API_KEY}")
-    private String apiKey;
-    @Value("${PAYOS_CLIENT_ID}")
-    private String clientId;
 
     @PostMapping("/create")
-    public ResponseEntity<CreateOrderResponse> createOrder(@RequestParam Long cartId) {
+    public ResponseEntity<CreateOrderResponse> createOrder(@RequestBody Map<String, Long> request) {
         try {
+            Long cartId = request.get("cartId");
+            if (cartId == null) {
+                System.err.println("CartId không tồn tại trong yêu cầu tạo đơn hàng");
+                return ResponseEntity.badRequest().build();
+            }
+
+            // Tạo đơn hàng và nhận response
             CreateOrderResponse response = orderService.createOrder(cartId);
+            if (response == null || response.getOrderCode() == null) {
+                System.err.println("Không thể tạo đơn hàng cho cartId: " + cartId);
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+            }
+
+            System.out.println("Đơn hàng được tạo thành công - OrderCode: " + response.getOrderCode() +
+                    ", QR Code URL: " + response.getQrCode() + ", Tổng tiền: " + response.getAmount());
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
+            System.err.println("Lỗi khi tạo đơn hàng: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
-    @GetMapping("/check-pending-status")
+    @GetMapping("/check-pending")
     public ResponseEntity<Boolean> checkIfUserHasPendingOrder(@RequestParam String userName) {
         boolean result = orderService.checkIfUserHasPendingOrder(userName);
         return ResponseEntity.ok(result);
@@ -66,7 +65,8 @@ public class OrderController {
     }
 
     @PutMapping("/change-order-status")
-    public ResponseEntity<Void> changeOrderStatus(@RequestParam Long orderCode,
+    public ResponseEntity<Void> changeOrderStatus(
+            @RequestParam Long orderCode,
             @RequestParam Order.OrderStatus status) {
         orderService.changeOrderStatus(orderCode, status);
         return ResponseEntity.ok().build();
@@ -106,5 +106,4 @@ public class OrderController {
     public List<OrderDTO> getAllDeliveredOrdersOfUser(@RequestParam String userName) throws Exception {
         return orderService.getAllOrdersOfUserByStatusAndName(userName, Order.OrderStatus.DELIVERED);
     }
-
 }

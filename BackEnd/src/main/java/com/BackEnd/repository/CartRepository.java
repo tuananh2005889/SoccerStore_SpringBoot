@@ -13,21 +13,23 @@ import java.util.Optional;
 // Optional --> tìm tối đa 1 bảng ghi, nếu không có thì trả về rỗng
 @Repository
 public interface CartRepository extends JpaRepository<Cart, Long> {
-    Optional<Cart> findCartByUserAndStatus(User user, Cart.CartStatus status);
+        Optional<Cart> findCartByUserAndStatus(User user, Cart.CartStatus status);
 
-    @Query("SELECT ci.id, p.images FROM CartItem ci " +
-            "JOIN ci.product p " +
-            "WHERE ci.cart.id = :cartId")
-    List<Object[]> findCartItemImageUrlsWithIdByCartId(@Param("cartId") Long cartId);
+        @Query("SELECT ci.id, p.images FROM CartItem ci " +
+                        "JOIN ci.product p " +
+                        "WHERE ci.cart.id = :cartId")
+        List<Object[]> findCartItemImageUrlsWithIdByCartId(@Param("cartId") Long cartId);
 
-    @Query(value = "SELECT MIN(pi.image_url) " +
-            "FROM product_images pi " +
-            "JOIN cart_items ci ON ci.product_id = pi.product_id " +
-            "WHERE ci.cart_id = :cartId " +
-            "GROUP BY ci.cart_item_id", nativeQuery = true)
-    List<String> findImageUrlPerCartItem(@Param("cartId") Long cartId);
+        @Query(value = "SELECT MIN(pi.image_url) " +
+                        "FROM product_images pi " +
+                        "JOIN cart_items ci ON ci.product_id = pi.product_id " +
+                        "WHERE ci.cart_id = :cartId " +
+                        "GROUP BY ci.cart_item_id", nativeQuery = true)
+        List<String> findImageUrlPerCartItem(@Param("cartId") Long cartId);
 
-    @Query("SELECT c.user FROM Cart c WHERE c.cartId = :cartId")
-    User findUserByCartId(@Param("cartId") Long cartId);
+        @Query("SELECT c.user FROM Cart c WHERE c.cartId = :cartId")
+        User findUserByCartId(@Param("cartId") Long cartId);
 
+        @Query("SELECT c FROM Cart c JOIN Order o ON c.cartId = o.cart.cartId WHERE o.orderId = :orderId")
+        Cart findByOrderId(@Param("orderId") Long orderId);
 }

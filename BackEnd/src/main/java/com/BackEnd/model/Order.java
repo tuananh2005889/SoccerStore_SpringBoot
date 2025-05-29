@@ -33,8 +33,12 @@ public class Order {
     @JsonFormat(pattern = "HH:mm:ss dd/MM/yyyy")
     private LocalDateTime createdAt;
 
-    @Column(nullable = false)
+    @Column(name = "total_amount", nullable = false)
     private Double totalPrice;
+
+    @ManyToOne
+    @JoinColumn(name = "cart_id")
+    private Cart cart;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
