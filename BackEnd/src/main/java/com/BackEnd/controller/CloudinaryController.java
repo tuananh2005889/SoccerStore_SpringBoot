@@ -15,8 +15,6 @@ import com.BackEnd.service.CloudinaryService;
 
 @RestController
 @RequestMapping("/upload")
-@CrossOrigin(origins = "*")
-
 public class CloudinaryController {
 
     @Autowired

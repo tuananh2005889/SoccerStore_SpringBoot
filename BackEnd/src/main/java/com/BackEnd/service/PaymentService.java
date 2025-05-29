@@ -2,52 +2,64 @@ package com.BackEnd.service;
 
 import com.BackEnd.dto.PaymentRequest;
 import com.BackEnd.utils.SignatureUtil;
-import jakarta.annotation.PostConstruct;
+import com.BackEnd.dto.CreateOrderResponse;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import vn.payos.PayOS;
 import vn.payos.type.CheckoutResponseData;
 import vn.payos.type.PaymentData;
-import java.util.HashMap;
-import java.util.Map;
+import vn.payos.type.ItemData;
+import vn.payos.type.Webhook;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 @Service
 public class PaymentService {
-    @Value("${PAYOS_API_KEY}")
-    private String apiKey;
-    @Value("${PAYOS_CLIENT_ID}")
-    private String clientId;
-    @Value("${PAYOS_CHECKSUM_KEY}")
-    private String checksumKey;
+    private final PayOS payOS;
 
-    private PayOS payOS;
-
-    @PostConstruct
-    public void init() {
-        payOS = new PayOS(clientId, apiKey, checksumKey);
+    public PaymentService(
+            @Value("${PAYOS_CLIENT_ID}") String clientId,
+            @Value("${PAYOS_API_KEY}") String apiKey,
+            @Value("${PAYOS_CHECKSUM_KEY}") String checksumKey) {
+        this.payOS = new PayOS(clientId, apiKey, checksumKey);
     }
 
-    public String createOrderInPayOS(PaymentRequest request) throws Exception {
-        Map<String, String> params = new HashMap<>();
-        params.put("amount", String.valueOf(request.getAmount()));
-        params.put("cancelUrl", "autoparts://payment-cancel");
-        params.put("description", request.getDescription());
-        params.put("orderCode", String.valueOf(request.getOrderCode()));
-        params.put("returnUrl", "autoparts://payment-return");
+    public String createOrderInPayOS(PaymentRequest paymentRequest) throws Exception {
+        // 1. Validate
+        if (paymentRequest.getOrderCode() == null || paymentRequest.getAmount() == null) {
+            throw new IllegalArgumentException("OrderCode và Amount không được null");
+        }
+        if (paymentRequest.getAmount() <= 0) {
+            throw new IllegalArgumentException("Amount phải > 0");
+        }
 
-        String signature = SignatureUtil.createSignature(params, checksumKey);
-
+        // 2. Chuẩn bị danh sách items
+        ItemData item = ItemData.builder()
+                .name("AutoParts Order #" + paymentRequest.getOrderCode())
+                .price(paymentRequest.getAmount())
+                .quantity(1)
+                .build();
         PaymentData paymentData = PaymentData.builder()
-                .orderCode(request.getOrderCode())
-                .amount(request.getAmount())
-                .description(request.getDescription())
-                .cancelUrl("autoparts://payment-cancel")
-                .returnUrl("autoparts://payment-return")
-                .signature(signature)
+                .orderCode(paymentRequest.getOrderCode())
+                .amount(paymentRequest.getAmount())
+                .description(paymentRequest.getDescription())
+                .items(Collections.singletonList(item))
+                .cancelUrl("http://localhost:3000/cancel")
+                .returnUrl("http://localhost:3000/success")
                 .build();
 
-        CheckoutResponseData checkoutResponse = payOS.createPaymentLink(paymentData);
-        String qrCode = checkoutResponse.getQrCode();
-        return qrCode;
+        // 3. Tạo link trên PayOS
+        CheckoutResponseData response = payOS.createPaymentLink(paymentData);
+
+        // 4. Lấy chuỗi Base64 của QR
+        String qrBase64 = response.getQrCode(); // hoặc getQrCodeImage() tùy SDK
+        if (qrBase64 == null) {
+            throw new RuntimeException("Không nhận được QR code từ PayOS");
+        }
+
+        return qrBase64;
     }
+
 }

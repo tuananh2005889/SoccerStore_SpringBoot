@@ -49,9 +49,13 @@ public class Cart {
     @Enumerated(EnumType.STRING)
     private CartStatus status;
 
+    @OneToOne(mappedBy = "cart")
+    private Order order;
+
     public enum CartStatus {
         ACTIVE,
         SUBMITTED,
+        COMPLETED
     }
 
     public Cart() {

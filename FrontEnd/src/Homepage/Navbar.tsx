@@ -77,6 +77,13 @@ const Navbar: React.FC = () => {
               <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-green-600 transition-all duration-300 group-hover:w-full"></span>
             </a>
 
+ <a 
+              href="orderhistory" 
+              className="text-gray-700 hover:text-green-600 transition-colors duration-200 relative group"
+            >
+              My orders
+              <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-green-600 transition-all duration-300 group-hover:w-full"></span>
+            </a>
             {/* Cart */}
             <a href="/cart" className="relative p-2 text-gray-700 hover:text-green-600 transition-colors duration-200">
               <FiShoppingCart className="w-5 h-5" />

@@ -13,12 +13,26 @@ interface CartItem {
   image: string;
 }
 
+interface CartInfo {
+  status: string;
+  cartId: number;
+}
+
 interface CartContextType {
   cartItems: CartItem[];
+  cartInfo: CartInfo | null;
+  cartId: number | null;
   addToCart: (product: CartItem) => Promise<void>;
-  removeFromCart: (productId: number) => Promise<void>;
+  removeFromCart: (cartItemId: number) => Promise<void>;
+  increaseQuantity: (cartItemId: number) => Promise<void>;
+  decreaseQuantity: (cartItemId: number) => Promise<void>;
   updateQuantity: (productId: number, quantity: number) => Promise<void>;
   clearCart: () => Promise<void>;
+  checkout: (cartId: number) => Promise<{ qrCode: string; orderCode: number }>;
+  checkPaymentStatus: (orderCode: number) => Promise<string>;
+  changeOrderStatus: (orderCode: number, status: string) => Promise<void>;
+  checkPendingOrder: () => Promise<boolean>;
+  setCartActive: () => Promise<void>;
   isInCart: (productId: number) => boolean;
   getItemQuantity: (productId: number) => number;
   totalItems: number;
@@ -28,21 +42,18 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// Axios instance with credentials
 const api = axios.create({
   baseURL: 'http://localhost:8080',
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true,
 });
 
-// Attach token to each request
 api.interceptors.request.use(config => {
   const token = localStorage.getItem('token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Global unauthorized handler
 api.interceptors.response.use(
   response => response,
   error => {
@@ -57,6 +68,7 @@ api.interceptors.response.use(
 export function CartProvider({ children }: { children: ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [cartId, setCartId] = useState<number | null>(null);
+  const [cartInfo, setCartInfo] = useState<CartInfo | null>(null);
   const [loading, setLoading] = useState(true);
 
   const isInCart = (productId: number): boolean =>
@@ -67,58 +79,52 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return found ? found.quantity : 0;
   };
 
-  // Fetch or create cart, then load items
   const fetchCartItems = async (): Promise<void> => {
     setLoading(true);
     let currentCartId: number;
 
-    // 1) Get or create cart
     try {
       const username = localStorage.getItem('username');
-      if (!username) throw new Error('Not authenticated');
-      const cartResp = await api.get<{ id?: number; cartId?: number }>('/app/cart', {
+      if (!username) throw new Error('Chưa đăng nhập');
+
+      // Lấy thông tin giỏ hàng
+      const cartResp = await api.get('/app/cart', {
         params: { userName: username },
       });
       const info = cartResp.data;
-      currentCartId = info.cartId ?? info.id!;
-      if (!currentCartId) throw new Error('Cart ID missing');
+      currentCartId = info.cartId;
+      if (!currentCartId) throw new Error('Mã giỏ hàng không tồn tại');
       setCartId(currentCartId);
-    } catch (e) {
-      console.error('Error fetching cart info:', e);
-      setCartId(null);
-      setCartItems([]);
-      setLoading(false);
-      return;
-    }
+      setCartInfo({ status: info.status || 'ACTIVE', cartId: currentCartId });
 
-    // 2) Get cart items
-    try {
-      const itemsResp = await api.get<any[]>('/app/cart/items', {
+      // Lấy danh sách sản phẩm trong giỏ hàng
+      const itemsResp = await api.get('/app/cart/items', {
         params: { cartId: currentCartId },
       });
       const rawItems = Array.isArray(itemsResp.data) ? itemsResp.data : [];
 
-      const formatted: CartItem[] = rawItems.map(it => {
-        // Handle possible undefined product
-        const prod = it.product || {};
-        return {
-          cartItemId: it.id,
-          productName: prod.productName ?? it.productName ?? '',
-          productId:  prod.productId ?? it.productId ?? 0,
-          price:      prod.price ?? it.price ?? 0,
-          brand:      prod.brand ?? it.brand ?? '',
-          description: prod.description ?? it.description ?? '',
-          quantity:   it.quantity ?? 0,
-          image:      Array.isArray(prod.images) && prod.images.length
-                         ? prod.images[0]
-                         : it.imageUrl ?? '',
-        };
-      });
+      const formatted: CartItem[] = rawItems.map((it: any) => ({
+        cartItemId: it.cartItemId,
+        productName: it.productName ?? '',
+        productId: it.productId ?? 0,
+        price: it.price ?? 0,
+        brand: it.brand ?? '',
+        description: it.description ?? '',
+        quantity: it.quantity ?? 0,
+        image: it.image ?? '',
+      }));
 
       setCartItems(formatted);
-    } catch (e) {
-      console.error('Error fetching cart items:', e);
+    } catch (e: any) {
+      console.error('Lỗi khi lấy thông tin giỏ hàng:', e);
+      setCartId(null);
       setCartItems([]);
+      setCartInfo(null);
+      if (e.response?.status === 404) {
+        toast.error('Giỏ hàng không tồn tại');
+      } else {
+        toast.error('Lỗi không mong muốn khi tải giỏ hàng');
+      }
     } finally {
       setLoading(false);
     }
@@ -130,80 +136,202 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addToCart = async (product: CartItem): Promise<void> => {
     if (!cartId) {
-      toast.error('Cart not initialized');
+      toast.error('Giỏ hàng chưa được khởi tạo');
       return;
     }
     try {
       await api.post('/app/cart/add', {
         cartId,
         productId: product.productId,
-        quantity:  product.quantity || 1,
+        quantity: product.quantity || 1,
       });
       await fetchCartItems();
-      // toast.success('Added to cart');
-    } catch (e) {
-      console.error('addToCart error:', e);
-      toast.error('Failed to add to cart');
+      toast.success('Đã thêm vào giỏ hàng');
+    } catch (e: any) {
+      console.error('Lỗi khi thêm vào giỏ hàng:', e);
+      if (e.response?.status === 400) {
+        toast.error('Yêu cầu không hợp lệ');
+      } else {
+        toast.error('Không thể thêm vào giỏ hàng');
+      }
     }
   };
 
-
-  const clearCart = async (): Promise<void> => {
-    if (!cartId) {
-      toast.error('Cart not initialized');
-      return;
-    }
-    try {
-      await api.delete('/app/cart/clear', { params: { cartId } });
-      await fetchCartItems();
-      toast.success('Cart cleared');
-    } catch (e) {
-      console.error('clearCart error:', e);
-      toast.error('Failed to clear cart');
-    }
-  };
-
-  const totalItems = cartItems.reduce((sum, it) => sum + it.quantity, 0);
-  const totalPrice = cartItems.reduce((sum, it) => sum + it.quantity * it.price, 0);
-
-
-  const removeFromCart = async (productId: number): Promise<void> => {
+  const removeFromCart = async (cartItemId: number): Promise<void> => {
     if (!cartId) {
       toast.error('Giỏ hàng chưa được khởi tạo');
       return;
     }
     try {
-      await api.delete('/app/cart/remove', { params: { cartId, productId } });
+      const item = cartItems.find(i => i.cartItemId === cartItemId);
+      if (!item) throw new Error('Sản phẩm không tồn tại trong giỏ hàng');
+      await api.delete('/app/cart/remove', {
+        params: { cartId, productId: item.productId },
+      });
       await fetchCartItems();
-      toast.success('Đã xóa sản phẩm khỏi giỏ hàng');
+      toast.success('Đã xóa khỏi giỏ hàng');
     } catch (e: any) {
-      console.error('removeFromCart error:', e);
-      toast.error(e.response?.data?.message || 'Không thể xóa sản phẩm');
+      console.error('Lỗi khi xóa khỏi giỏ hàng:', e);
+      if (e.response?.status === 404) {
+        toast.error('Sản phẩm không tìm thấy trong giỏ hàng');
+      } else {
+        toast.error('Không thể xóa khỏi giỏ hàng');
+      }
     }
   };
-  
+
+  const increaseQuantity = async (cartItemId: number): Promise<void> => {
+    const item = cartItems.find(i => i.cartItemId === cartItemId);
+    if (!item || !cartId) {
+      toast.error('Sản phẩm hoặc giỏ hàng không hợp lệ');
+      return;
+    }
+    await updateQuantity(item.productId, item.quantity + 1);
+  };
+
+  const decreaseQuantity = async (cartItemId: number): Promise<void> => {
+    const item = cartItems.find(i => i.cartItemId === cartItemId);
+    if (!item || !cartId) {
+      toast.error('Sản phẩm hoặc giỏ hàng không hợp lệ');
+      return;
+    }
+    if (item.quantity <= 1) {
+      await removeFromCart(cartItemId);
+      return;
+    }
+    await updateQuantity(item.productId, item.quantity - 1);
+  };
+
   const updateQuantity = async (productId: number, quantity: number): Promise<void> => {
     if (!cartId || quantity < 1) {
       toast.error('Số lượng không hợp lệ');
       return;
     }
     try {
-      await api.put('/app/cart/update', { cartId, productId, quantity });
+      const request = { cartId, productId, quantity };
+      await api.put('/app/cart/update', request);
       await fetchCartItems();
       toast.success('Đã cập nhật số lượng');
     } catch (e: any) {
-      console.error('updateQuantity error:', e);
-      toast.error(e.response?.data?.message || 'Không thể cập nhật số lượng');
+      console.error('Lỗi khi cập nhật số lượng:', e);
+      if (e.response?.status === 400) {
+        toast.error('Yêu cầu không hợp lệ');
+      } else if (e.response?.status === 404) {
+        toast.error('Sản phẩm không tìm thấy trong giỏ hàng');
+      } else {
+        toast.error('Không thể cập nhật số lượng');
+      }
     }
   };
+
+  const clearCart = async (): Promise<void> => {
+    if (!cartId) {
+      toast.error('Giỏ hàng chưa được khởi tạo');
+      return;
+    }
+    try {
+      await api.delete('/app/cart/clear', { params: { cartId } });
+      await fetchCartItems();
+      toast.success('Đã xóa giỏ hàng');
+    } catch (e: any) {
+      console.error('Lỗi khi xóa giỏ hàng:', e);
+      if (e.response?.status === 404) {
+        toast.error('Giỏ hàng không tồn tại');
+      } else {
+        toast.error('Không thể xóa giỏ hàng');
+      }
+    }
+  };
+
+const checkout = async (cartId: number): Promise<{ qrCode: string; orderCode: number }> => {
+  try {
+    const response = await api.post('/app/order/create', { cartId });
+    const { qrCode, orderCode } = response.data;
+    if (!qrCode || !orderCode) {
+      throw new Error('Phản hồi từ server không hợp lệ');
+    }
+    return { qrCode, orderCode };
+  } catch (e: any) {
+    console.error('Lỗi khi tạo thanh toán:', e);
+    const errorMessage = e.response?.data?.message || 'Không thể tạo thanh toán. Vui lòng thử lại.';
+    toast.error(errorMessage);
+    throw e;
+  }
+};
+
+  const checkPaymentStatus = async (orderCode: number): Promise<string> => {
+    try {
+      const response = await api.get('/app/payment/status', { params: { orderCode } });
+      return response.data; // Trả về "PAID", "CANCELLED", hoặc "PENDING"
+    } catch (e: any) {
+      console.error('Lỗi khi kiểm tra trạng thái thanh toán:', e);
+      toast.error(e.response?.data?.message || 'Không thể kiểm tra trạng thái thanh toán');
+      throw e;
+    }
+  };
+
+  const changeOrderStatus = async (orderCode: number, status: string): Promise<void> => {
+    try {
+      await api.put('/app/order/change-order-status', null, {
+        params: { orderCode, status },
+      });
+    } catch (e: any) {
+      console.error('Lỗi khi thay đổi trạng thái đơn hàng:', e);
+      toast.error(e.response?.data?.message || 'Không thể thay đổi trạng thái đơn hàng');
+      throw e;
+    }
+  };
+
+  const checkPendingOrder = async (): Promise<boolean> => {
+    try {
+      const username = localStorage.getItem('username');
+      if (!username) throw new Error('Chưa đăng nhập');
+      const response = await api.get('/app/order/check-pending', {
+        params: { userName: username },
+      });
+      return response.data;
+    } catch (e: any) {
+      console.error('Lỗi khi kiểm tra đơn hàng đang chờ:', e);
+      toast.error(e.response?.data?.message || 'Không thể kiểm tra đơn hàng đang chờ');
+      return false;
+    }
+  };
+
+  const setCartActive = async (): Promise<void> => {
+    try {
+      const username = localStorage.getItem('username');
+      if (!username) throw new Error('Chưa đăng nhập');
+      await api.post('/app/cart/activate', null, {
+        params: { userName: username },
+      });
+      await fetchCartItems();
+    } catch (e: any) {
+      console.error('Lỗi khi kích hoạt giỏ hàng:', e);
+      toast.error(e.response?.data?.message || 'Không thể kích hoạt giỏ hàng');
+      throw e;
+    }
+  };
+
+  const totalItems = cartItems.reduce((sum, it) => sum + it.quantity, 0);
+  const totalPrice = cartItems.reduce((sum, it) => sum + it.quantity * it.price, 0);
+
   return (
     <CartContext.Provider
       value={{
         cartItems,
+        cartInfo,
+        cartId,
         addToCart,
         removeFromCart,
+        increaseQuantity,
+        decreaseQuantity,
         updateQuantity,
         clearCart,
+        checkout,
+        checkPaymentStatus,
+        changeOrderStatus,
+        checkPendingOrder,
+        setCartActive,
         isInCart,
         getItemQuantity,
         totalItems,
@@ -221,5 +349,3 @@ export function useCart(): CartContextType {
   if (!ctx) throw new Error('useCart must be used within CartProvider');
   return ctx;
 }
-
-

@@ -3,12 +3,15 @@ package com.BackEnd.service;
 import com.BackEnd.dto.AddToCartRequest;
 import com.BackEnd.dto.BasicCartInfoDto;
 import com.BackEnd.dto.CartItemDTO;
+import com.BackEnd.dto.CreateOrderResponse;
 import com.BackEnd.model.Cart;
 import com.BackEnd.model.CartItem;
+import com.BackEnd.model.Order;
 import com.BackEnd.model.Product;
 import com.BackEnd.model.User;
 import com.BackEnd.repository.CartItemRepository;
 import com.BackEnd.repository.CartRepository;
+import com.BackEnd.repository.OrderRepository;
 import com.BackEnd.repository.ProductRepository;
 import com.BackEnd.repository.UserRepository;
 import com.BackEnd.utils.DTOConverter;
@@ -21,6 +24,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -34,6 +38,51 @@ public class CartService {
     private final CartItemRepository cartItemRepo;
     private final ProductRepository productRepo;
     private final UserRepository userRepo;
+    private final OrderRepository orderRepository;
+
+    public CreateOrderResponse createOrder(Long cartId) {
+        try {
+            // Lấy giỏ hàng và user
+            Cart cart = getCartByCartId(cartId);
+            User user = getUserByCartId(cartId);
+            if (cart == null || user == null) {
+                throw new IllegalArgumentException("Giỏ hàng hoặc người dùng không tồn tại");
+            }
+
+            // Tính tổng tiền từ giỏ hàng
+            Double totalAmount = getCartTotalAmount(cartId);
+            if (totalAmount == null || totalAmount <= 0) {
+                throw new IllegalArgumentException("Tổng tiền không hợp lệ cho giỏ hàng: " + cartId);
+            }
+
+            // Tạo đơn hàng mới
+            Order order = new Order();
+            order.setOrderCode(generateOrderCode());
+            order.setCreatedAt(LocalDateTime.now());
+            order.setStatus(Order.OrderStatus.PENDING);
+            order.setCart(cart);
+            order.setUser(user);
+            order.setTotalPrice(totalAmount); // Gán totalPrice
+            order.setShippingAddress(null); // Có thể để null nếu chưa có địa chỉ
+            order.setQrCodeToCheckout(null); // Sẽ được cập nhật sau khi tạo QR
+
+            // Lưu đơn hàng
+            Order savedOrder = orderRepository.save(order);
+
+            // Tạo response
+            CreateOrderResponse response = new CreateOrderResponse();
+            response.setOrderCode(savedOrder.getOrderCode());
+            response.setAmount(totalAmount);
+            return response;
+        } catch (Exception e) {
+            throw new RuntimeException("Lỗi khi tạo đơn hàng: " + e.getMessage(), e);
+        }
+    }
+
+    private Long generateOrderCode() {
+        // Logic tạo orderCode duy nhất (có thể dùng timestamp + random)
+        return System.currentTimeMillis();
+    }
 
     public BasicCartInfoDto getOrCreateActiveCartDTO(String userName) {
         User user = userRepo.findByUserName(userName)
@@ -55,7 +104,7 @@ public class CartService {
         Cart cart = cartRepo.findById(req.getCartId())
                 .orElseThrow(() -> new RuntimeException("Cart not found: " + req.getCartId()));
         Product product = productRepo.findByProductId(req.getProductId())
-                .orElseThrow(() -> new RuntimeException("Prodcut not found: " + req.getProductId()));
+                .orElseThrow(() -> new RuntimeException("Product not found: " + req.getProductId()));
 
         CartItem item = cartItemRepo.findByCartIdAndProductId(req.getCartId(), req.getProductId())
                 .map(existing -> {
@@ -94,7 +143,6 @@ public class CartService {
                 .orElseThrow(() -> new RuntimeException("Cart not found"));
 
         return cart.getCartItems();
-
     }
 
     public Cart getCartByCartId(Long cartId) {
@@ -165,7 +213,7 @@ public class CartService {
                 .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
 
         CartItem cartItem = cartItemRepo.findByCartIdAndProductId(cartId, productId)
-                .orElseThrow(() -> new RuntimeException("No product fount in cart: " + productId));
+                .orElseThrow(() -> new RuntimeException("No product found in cart: " + productId));
 
         cartItem.setQuantity(quantity);
         cartItemRepo.save(cartItem);
@@ -189,4 +237,17 @@ public class CartService {
         return user;
     }
 
+    // Thêm phương thức getCartTotalAmount để tính tổng tiền giỏ hàng
+    public Double getCartTotalAmount(Long cartId) {
+        Cart cart = cartRepo.findById(cartId)
+                .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
+
+        if (cart.getCartItems() == null || cart.getCartItems().isEmpty()) {
+            return 0.0;
+        }
+
+        return cart.getCartItems().stream()
+                .mapToDouble(cartItem -> cartItem.getProduct().getPrice() * cartItem.getQuantity())
+                .sum();
+    }
 }

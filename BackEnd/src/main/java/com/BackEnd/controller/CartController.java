@@ -144,4 +144,12 @@ public class CartController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
+
+    @PostMapping("/activate")
+    public ResponseEntity<Void> activateCart(@RequestParam String userName) {
+        // Tìm giỏ hàng hiện tại của user và đặt lại trạng thái thành ACTIVE
+        BasicCartInfoDto cart = cartService.getOrCreateActiveCartDTO(userName);
+        cartService.changeCartStatus(cart.getCartId(), Cart.CartStatus.ACTIVE);
+        return ResponseEntity.ok().build();
+    }
 }

@@ -11,6 +11,7 @@ import ProductLayout from "./Page/ProductLayout";
 import Cart from "./Page/Cart";
 import Profile from "./Page/Profile";
 import Login from "./Login/Login";
+import OrderHistory from './Page/OrderHistory';
 
 const App: React.FC = () => {
   return (
@@ -25,6 +26,8 @@ const App: React.FC = () => {
             <Route path="/cart" element={<Cart/>}/>
             <Route path="/Profile" element={<Profile/>}/>
             <Route path="/" element={<HomePage/>}/>
+            <Route path="/orderhistory" element={<OrderHistory />} />
+
           </Routes>
         </CartProvider>
       </AuthProvider>
