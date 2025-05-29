@@ -9,29 +9,33 @@ import lombok.Setter;
 @Getter
 @Setter
 public class OrderDetail {
-    @Id
-    @Column(name = "order_detail_id")
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long orderDetailId;
+        @Id
+        @Column(name = "order_detail_id")
+        @GeneratedValue(strategy = GenerationType.IDENTITY)
+        private Long orderDetailId;
 
-    @ManyToOne
-    @JoinColumn(name = "order_id", nullable = false,
-            referencedColumnName = "order_id"
-    //foreignKey = @ForeignKey(name = "fk_orderDetails_order")
-    )
-    private Order order;
+        @ManyToOne
+        @JoinColumn(name = "order_id", nullable = false, referencedColumnName = "order_id"
+        // foreignKey = @ForeignKey(name = "fk_orderDetails_order")
+        )
+        private Order order;
 
-    @ManyToOne
-    @JoinColumn(name = "product_id",
-            referencedColumnName = "product_id",
-            nullable = false
-    //foreignKey = @ForeignKey(name = "fk_orderDetails_product")
-    )
-    private Product product;
+        @ManyToOne
+        @JoinColumn(name = "product_id", referencedColumnName = "product_id", nullable = false
+        // foreignKey = @ForeignKey(name = "fk_orderDetails_product")
+        )
+        private Product product;
 
-    @Column(nullable = false)
-    private int quantity;
+        @Column(nullable = false)
+        private int quantity;
+        @Column(nullable = false)
+        private Double totalPrice;
 
-    @Column(nullable = false)
-    private Double price;
+        public OrderDetail(Order order, Product product, int quantity, Double totalPrice) {
+                this.order = order;
+                this.product = product;
+                this.quantity = quantity;
+                this.totalPrice = totalPrice;
+        }
+
 }

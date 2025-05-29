@@ -1,39 +1,23 @@
 package com.BackEnd.utils;
 
-import com.BackEnd.dto.CartBasicInfoDTO;
-import com.BackEnd.dto.CartDTO;
-import com.BackEnd.dto.CartItemDTO;
-import com.BackEnd.dto.BasicCartItemDTO;
+import com.BackEnd.dto.*;
 import com.BackEnd.model.Cart;
 import com.BackEnd.model.CartItem;
+import com.BackEnd.model.Order;
+import com.BackEnd.model.OrderDetail;
 
 import java.util.List;
 import java.util.stream.Collectors;
 
 public class DTOConverter {
-    public static CartItemDTO toCartItemDTO(CartItem cartItem) {
-        Long cartItemId = cartItem.getCartItemId();
-        Long productId = cartItem.getProduct().getProductId();
-        String name = cartItem.getProduct().getName();
-        Double price = cartItem.getProduct().getPrice();
-        // Lấy hình đầu tiên nếu có
-        String brand = cartItem.getProduct().getBrand();
-        String description = cartItem.getProduct().getDescription();
-        String imageUrl = cartItem.getProduct().getImages() != null
-                && !cartItem.getProduct().getImages().isEmpty()
-                        ? cartItem.getProduct().getImages().get(0)
-                        : "";
-        Integer quantity = cartItem.getQuantity();
 
+    public static CartItemDTO toCartItemDTO(CartItem cartItem) {
         return new CartItemDTO(
-                cartItemId,
-                productId,
-                name,
-                price,
-                imageUrl,
-                brand,
-                description,
-                quantity);
+                cartItem.getCartItemId(),
+                cartItem.getProduct().getProductId(),
+                cartItem.getProduct().getName(),
+                cartItem.getProduct().getPrice(),
+                cartItem.getQuantity());
     }
 
     public static CartDTO toCartDTO(Cart cart) {
@@ -48,16 +32,41 @@ public class DTOConverter {
                 cart.getStatus().name());
     }
 
-    public static CartBasicInfoDTO toCartBasicInfoDTO(Cart cart) {
+    public static BasicCartInfoDto toCartBasicInfoDTO(Cart cart) {
         Long cartId = cart.getCartId();
         String status = cart.getStatus().name();
-        return new CartBasicInfoDTO(cartId, status);
+        Double totalPrice = cart.getTotalPrice();
+        return new BasicCartInfoDto(cartId, status, totalPrice);
     }
 
     public static BasicCartItemDTO toBasicCartItemDTO(CartItem cartItem) {
         Long productId = cartItem.getProduct().getProductId();
         int quantity = cartItem.getQuantity();
         return new BasicCartItemDTO(productId, quantity);
+    }
+
+    public static OrderDetailDTO toOrderDetailDTO(OrderDetail orderDetail) {
+        return new OrderDetailDTO(
+                orderDetail.getProduct().getProductId(),
+                orderDetail.getProduct().getName(),
+                orderDetail.getQuantity(),
+                orderDetail.getTotalPrice());
+    }
+
+    public static OrderDTO toOrderDTO(Order order) {
+        // String createAt = order.getCreatedAt().toString();
+        List<OrderDetailDTO> orderDetailDTOList = order.getOrderDetails().stream()
+                .map(orderDetail -> toOrderDetailDTO(orderDetail)).collect(Collectors.toList());
+        return new OrderDTO(
+                order.getOrderId(),
+                order.getOrderCode(),
+                order.getUser().getUserName(),
+                // createAt,
+                order.getCreatedAt(),
+                order.getTotalPrice(),
+                order.getStatus(),
+                order.getQrCodeToCheckout(),
+                orderDetailDTOList);
     }
 
 }

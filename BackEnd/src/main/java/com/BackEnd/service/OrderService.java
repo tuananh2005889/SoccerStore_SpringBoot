@@ -1,174 +1,155 @@
 package com.BackEnd.service;
 
+import com.BackEnd.dto.*;
+import com.BackEnd.model.*;
 import com.BackEnd.repository.*;
 import com.BackEnd.repository.OrderDetailRepository;
+import com.BackEnd.utils.DTOConverter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
+
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
+import java.util.Random;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class OrderService {
     private final CartService cartService;
+    private final UserService userService;
+    private final PaymentService paymentService;
     private final OrderRepository orderRepo;
-    private final OrderDetailRepository orderDetailsRepo;
-    private final PaymentRepository paymentRepo;
-    private final UserRepository userRepo;
-}
-//    public Order checkout(String userName, String paymentMethod) {
-//        Cart cart = cartService.getActiveCart(userName);
-//        User user = cart.getUser();
-//        List<CartItem> items = cart.getCartItems();
-//
-//        Order order = new Order();
-//        order.setUser(user);
-//        order.setStatus("pending");
-//        order.setTotalAmount(items.stream().mapToDouble(i -> i.getPrice() * i.getQuantity()).sum());
-//        order = orderRepo.save(order);
-//
-//        for (CartItem item : items) {
-//            OrderDetail details = new OrderDetail();
-//            details.setOrder(order);
-//            details.setProduct(item.getProduct());
-//            details.setQuantity(item.getQuantity());
-//            details.setPrice(item.getPrice());
-//            orderDetailsRepo.save(details);
-//        }
-//
-//        Payment payment = new Payment();
-//        payment.setOrder(order);
-//        payment.setAmount(order.getTotalAmount());
-//        payment.setPaymentMethod(paymentMethod);
-//        payment.setPaymentStatus("completed");
-//        paymentRepo.save(payment);
-//
-//        cart.setStatus(Cart.CartStatus.PAID);
-//        cartService.cartRepo.save(cart);
-//
-//        return order;
-//    }
-//}
+    private final OrderDetailRepository orderDetailRepo;
 
-//@Service
-//public class OrderService {
-//
-//    private static final Logger logger = LoggerFactory.getLogger(OrderService.class);
-//
-//    @Autowired
-//    private OrderRepository orderRepository;
-//
-//    @Autowired
-//    private UserRepository userRepository; // Dùng để truy vấn User
-//
-//    @Autowired
-//    private OrderDetailRepository orderDetailRepository;
-//
-//    @Autowired
-//    private ProductRepository productRepository;
-//
-//    public boolean addToCart(User user, String productId, int quantity) {
-//        try {
-//            // Lấy đối tượng User persistent từ DB dựa trên userName
-//            Optional<User> persistentUserOpt = userRepository.findByUserName(user.getUserName());
-//            if (!persistentUserOpt.isPresent()) {
-//                logger.error("User with userName '{}' not found in DB", user.getUserName());
-//                return false;
-//            }
-//            user = persistentUserOpt.get();
-//
-//            // Lấy sản phẩm từ DB
-//            Optional<Product> productOpt = productRepository.findById(productId);
-//            if (productOpt.isEmpty()) {
-//                logger.error("Product not found for id: {}", productId);
-//                return false;
-//            }
-//            if (quantity <= 0) {
-//                logger.error("Invalid quantity: {} provided", quantity);
-//                return false;
-//            }
-//            Product product = productOpt.get();
-//
-//            // Sử dụng truy vấn theo userName thay vì đối tượng User
-//            Optional<Order> orderOpt = orderRepository.findByUser_UserNameAndStatus(user.getUserName(), "Pending");
-//            Order order;
-//            if (orderOpt.isPresent()) {
-//                order = orderOpt.get();
-//            } else {
-//                order = new Order();
-//                order.setUser(user);
-//                order.setOrderDate(LocalDateTime.now());
-//                order.setStatus("Pending");
-//                order.setTotalAmount(0.0);
-//                orderRepository.save(order);
-//            }
-//
-//            // Thêm chi tiết đơn hàng cho sản phẩm mới
-//            OrderDetail orderDetail = new OrderDetail();
-//            orderDetail.setOrder(order);
-//            orderDetail.setProduct(product);
-//            orderDetail.setQuantity(quantity);
-//            orderDetail.setPrice(product.getPrice() * quantity);
-//            orderDetailRepository.save(orderDetail);
-//
-//            // Cập nhật tổng tiền của đơn hàng
-//            double newTotal = order.getTotalAmount() + (product.getPrice() * quantity);
-//            order.setTotalAmount(newTotal);
-//            orderRepository.save(order);
-//
-//            return true;
-//        } catch (Exception e) {
-//            logger.error("Unexpected error in addToCart: {}", e.getMessage(), e);
-//            return false;
-//        }
-//    }
-//
-//    // Chuyển đổi OrderDetail thành DTO để tránh lazy-loading lỗi khi serialize JSON
-//    public List<CartItem> getCartByUser(User user) {
-//        try {
-//            Optional<Order> orderOpt = orderRepository.findByUser_UserNameAndStatus(user.getUserName(), "Pending");
-//            if (orderOpt.isPresent()) {
-//                List<OrderDetail> details = orderDetailRepository.findByOrder(orderOpt.get());
-//                return details.stream().map(detail -> {
-//                    CartItem item = new CartItem();
-//                    // Giả sử Product có trường id, name, price, và danh sách images
-//                    item.setProductId(detail.getProduct().getProductId());
-//                    item.setProductName(detail.getProduct().getName());
-//                    item.setQuantity(detail.getQuantity());
-//                    item.setPrice(detail.getPrice());
-//                    if (detail.getProduct().getImages() != null && !detail.getProduct().getImages().isEmpty()) {
-//                        item.setImageUrl(detail.getProduct().getImages().get(0));
-//                    } else {
-//                        item.setImageUrl(null);
-//                    }
-//                    return item;
-//                }).collect(Collectors.toList());
-//            }
-//            return Collections.emptyList();
-//        } catch (Exception e) {
-//            logger.error("Error fetching cart items for user '{}': {}", user.getUserName(), e.getMessage(), e);
-//            return Collections.emptyList();
-//        }
-//    }
-//
-//    // Phương thức removeItemFromCart không thay đổi nhiều
-//    public boolean removeItemFromCart(Long orderDetailId) {
-//        try {
-//            Optional<OrderDetail> detailOpt = orderDetailRepository.findById(orderDetailId);
-//            if (detailOpt.isPresent()) {
-//                OrderDetail detail = detailOpt.get();
-//                Order order = detail.getOrder();
-//                double priceReduction = detail.getPrice();
-//
-//                orderDetailRepository.delete(detail);
-//                double newTotal = order.getTotalAmount() - priceReduction;
-//                order.setTotalAmount(newTotal);
-//                orderRepository.save(order);
-//                return true;
-//            }
-//            logger.error("OrderDetail not found for id: {}", orderDetailId);
-//            return false;
-//        } catch (Exception e) {
-//            logger.error("Unexpected error when removing item from cart: {}", e.getMessage(), e);
-//            return false;
-//        }
-//    }
-//}
+    public CreateOrderResponse createOrder(Long cartId) {
+        cartService.changeCartStatus(cartId, Cart.CartStatus.SUBMITTED);
+
+        User user = cartService.getUserByCartId(cartId);
+        List<CartItem> cartItemList = cartService.getAllCartItemsInActiveCart(cartId);
+
+        List<OrderDetail> orderDetailList = cartItemList.stream()
+                .map(cartItem -> {
+                    Product product = cartItem.getProduct();
+                    if (product == null || product.getPrice() == null) {
+                        throw new IllegalArgumentException("CartItem contains invalid product or price");
+                    }
+                    int quantity = cartItem.getQuantity();
+                    double totalPrice = quantity * product.getPrice();
+                    return new OrderDetail(null, product, quantity, totalPrice);
+                })
+                .collect(Collectors.toList());
+
+        double cartTotalPrice = orderDetailList.stream()
+                .mapToDouble(OrderDetail::getTotalPrice)
+                .sum();
+
+        Long orderCode = 0L;
+        String qrCode = null;
+        int retry = 0;
+        boolean success = false;
+        while (!success && retry < 5) {
+            try {
+                orderCode = System.currentTimeMillis() + new Random().nextInt(9999);
+                PaymentRequest paymentRequest = new PaymentRequest(orderCode, (int) cartTotalPrice,
+                        "AutoParts Checkout");
+                qrCode = paymentService.createOrderInPayOS(paymentRequest);
+                success = true;
+
+                Order order = new Order();
+                order.setQrCodeToCheckout(qrCode);
+                order.setUser(user);
+                order.setStatus(Order.OrderStatus.PENDING);
+                order.setCreatedAt(LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS));
+                order.setShippingAddress("test");
+                order.setOrderCode(orderCode);
+                order.setTotalPrice(cartTotalPrice);
+
+                for (OrderDetail od : orderDetailList) {
+                    od.setOrder(order);
+                }
+                order.setOrderDetails(orderDetailList);
+                orderRepo.save(order);
+
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode() == HttpStatus.CONFLICT) {
+                    retry++;
+                    System.out.println("OrderCode is duplicate, please try again");
+                } else {
+                    throw e;
+                }
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+        if (!success) {
+            throw new RuntimeException("Cannot create order because duplicate orderCode too much");
+        }
+
+        return new CreateOrderResponse(qrCode, orderCode);
+    }
+
+    public Boolean checkIfUserHasPendingOrder(String userName) {
+        User user = userService.getUserByName(userName);
+        return orderRepo.existsByUserAndStatus(user, Order.OrderStatus.PENDING);
+    }
+
+    public Long getPendingOrderId(String userName) {
+        User user = userService.getUserByName(userName);
+        Order order = orderRepo.findTopByUserAndStatusOrderByCreatedAtDesc(user, Order.OrderStatus.PENDING);
+        return order.getOrderId();
+    }
+
+    @Transactional
+    public List<OrderDetailDTO> getOrderDetailListInPendingOrder(String userName) {
+        User user = userService.getUserByName(userName);
+        List<Order> orderList = orderRepo.findByUserAndStatus(user, Order.OrderStatus.PENDING);
+        List<OrderDetail> orderDetailList = new ArrayList<>();
+        orderList.stream().findFirst().ifPresent(order -> {
+            orderDetailList.addAll(order.getOrderDetails());
+        });
+        return orderDetailList.stream()
+                .map(DTOConverter::toOrderDetailDTO)
+                .collect(Collectors.toList());
+    }
+
+    public void changeOrderStatus(Long orderCode, Order.OrderStatus status) {
+        try {
+            Order order = orderRepo.findByOrderCode(orderCode);
+            order.setStatus(status);
+            orderRepo.save(order);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    @Transactional
+    public List<OrderDTO> getOrdersByStatus(Order.OrderStatus status) {
+        List<Order> orders = orderRepo.findByStatus(status);
+        return orders.stream().map(
+                order -> DTOConverter.toOrderDTO(order)).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public List<OrderDTO> getAllOrders() {
+        List<Order> orders = orderRepo.findAll();
+        return orders.stream().map(order -> DTOConverter.toOrderDTO(order)).collect(Collectors.toList());
+    }
+
+    @Transactional
+    public List<OrderDTO> getAllOrdersOfUserByStatusAndName(String userName, Order.OrderStatus status) {
+        User user = userService.getUserByName(userName);
+        List<Order> orderList = orderRepo.findByUserAndStatus(user, status);
+        return orderList.stream().map(order -> {
+            return DTOConverter.toOrderDTO(order);
+        }).collect(Collectors.toList());
+    }
+
+}

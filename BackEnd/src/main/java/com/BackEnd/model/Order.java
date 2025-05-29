@@ -1,6 +1,10 @@
 package com.BackEnd.model;
+
+import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -11,6 +15,7 @@ import java.util.List;
 @Setter
 @NoArgsConstructor
 @AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public class Order {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -18,26 +23,40 @@ public class Order {
     private Long orderId;
 
     @ManyToOne
-    @JoinColumn(name = "user_id",
-            referencedColumnName = "user_id",
-            nullable = false)
+    @JoinColumn(name = "user_id", referencedColumnName = "user_id", nullable = false)
     private User user;
 
-    @Column(nullable = false, columnDefinition = "TIMESTAMP DEFAULT CURRENT_TIMESTAMP")
-    private LocalDateTime orderDate;
+    @Column(unique = true)
+    private Long orderCode;
+
+    @Column(columnDefinition = "DATETIME(0)")
+    @JsonFormat(pattern = "HH:mm:ss dd/MM/yyyy")
+    private LocalDateTime createdAt;
 
     @Column(nullable = false)
-    private Double totalAmount;
+    private Double totalPrice;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 50)
-    private String status = "Pending";
+    private OrderStatus status = OrderStatus.PENDING;
 
     @Column(columnDefinition = "TEXT")
     private String shippingAddress;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL)
-    private List<OrderDetail> orderDetail;
+    private List<OrderDetail> orderDetails;
 
     @OneToOne(mappedBy = "order", cascade = CascadeType.ALL)
     private Payment payment;
+
+    private String qrCodeToCheckout;
+
+    public enum OrderStatus {
+        PENDING,
+        PAID,
+        CANCELLED,
+        SUBMITTED,
+        SHIPPED,
+        DELIVERED,
+    }
 }
