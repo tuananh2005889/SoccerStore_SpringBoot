@@ -26,7 +26,10 @@ public class CartController {
     public ResponseEntity<CartBasicInfoDTO> getOrCreateActiveCart(
             @RequestParam String userName) {
         try {
-            CartBasicInfoDTO dto = cartService.getOrCreateActiveCartDTO(userName);
+            BasicCartInfoDto basicDto = cartService.getOrCreateActiveCartDTO(userName);
+            CartBasicInfoDTO dto = new CartBasicInfoDTO(
+                    basicDto.getCartId(),
+                    basicDto.getStatus());
             return ResponseEntity.ok(dto);
         } catch (RuntimeException ex) {
             log.warn("User '{}' not found when getting/creating cart", userName, ex);
@@ -107,21 +110,6 @@ public class CartController {
         } catch (Exception ex) {
             log.error("Error fetching image URLs for cart {}", cartId, ex);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
-        }
-    }
-
-    @PostMapping("/checkout")
-    public ResponseEntity<String> checkoutCart(
-            @RequestParam Long cartId) {
-        try {
-            cartService.checkoutCart(cartId);
-            return ResponseEntity.ok("Cart successfully checked out and paid.");
-        } catch (RuntimeException ex) {
-            log.warn("Cart {} not found for checkout", cartId, ex);
-            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("Cart not found");
-        } catch (Exception ex) {
-            log.error("Error during checkout for cart {}", cartId, ex);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("Checkout failed");
         }
     }
 

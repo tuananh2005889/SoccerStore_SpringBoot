@@ -7,7 +7,8 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class CartBasicInfoDTO {
+public class BasicCartInfoDto {
     private Long cartId;
     private String status;
+    private Double totalPrice;
 }

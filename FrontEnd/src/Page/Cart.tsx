@@ -107,12 +107,7 @@ const Cart: React.FC = () => {
           <div className="lg:col-span-2 bg-white rounded-lg shadow-sm overflow-hidden">
             {cartItems.map(item => (
               <div key={item.cartItemId} className="p-6 border-b border-gray-200 flex items-start">
-                <img
-                  src={item.image || '/placeholder-product.jpg'}
-                  alt={item.productName}
-                  className="w-24 h-24 object-cover rounded-lg"
-                  onError={e => { (e.target as HTMLImageElement).src = '/placeholder-product.jpg'; }}
-                />
+         
                 <div className="ml-6 flex-1">
                   <div className="flex justify-between items-start">
                     <div>

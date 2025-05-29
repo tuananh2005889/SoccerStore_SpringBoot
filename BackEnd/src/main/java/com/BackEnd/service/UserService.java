@@ -16,6 +16,8 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Random;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class UserService {
@@ -104,16 +106,37 @@ public class UserService {
                 .orElse(false);
     }
 
+    @Transactional
     public UserDTO updateUserInfo(UpdateUserInfoRequest dto) {
-        User user = userRepo.findByUserName(dto.getUserName())
+        User u = userRepo.findByUserName(dto.getUserName())
+                .orElseThrow(() -> new RuntimeException("User not found: " + dto.getUserName()));
+
+        u.setFullName(dto.getFullName());
+        u.setGmail(dto.getGmail());
+        // nếu password không rỗng thì cập nhật
+        if (dto.getPassword() != null && !dto.getPassword().isEmpty()) {
+            u.setPassword(dto.getPassword());
+        }
+        u.setPhone(dto.getPhone());
+        u.setAddress(dto.getAddress());
+        User saved = userRepo.save(u);
+        return toDto(saved);
+    }
+
+    public User getUserById(Long id) {
+        return userRepo.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
+    }
 
-        user.setFullName(dto.getFullName());
-        user.setGmail(dto.getGmail());
-        user.setPhone(dto.getPhone());
-        user.setAddress(dto.getAddress());
+    public User getUserByName(String name) {
+        return userRepo.findByUserName(name)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+    }
 
-        User updatedUser = userRepo.save(user);
-        return toDto(updatedUser);
+    public List<UserDTO> getAllUsers() {
+        return userRepo.findAll()
+                .stream()
+                .map(this::toDto)
+                .collect(Collectors.toList());
     }
 }

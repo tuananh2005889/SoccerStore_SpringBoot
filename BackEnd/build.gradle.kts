@@ -55,7 +55,8 @@ dependencies {
     implementation("org.springframework.security:spring-security-crypto")
     // implementation("org.springframework.boot:spring-boot-starter-security")
 
-
+    implementation("vn.payos:payos-java:1.0.3")
+    implementation("org.springframework.boot:spring-boot-starter-webflux")
 }
 
 tasks.withType<Test> {

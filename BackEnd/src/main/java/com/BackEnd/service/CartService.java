@@ -1,7 +1,7 @@
 package com.BackEnd.service;
 
 import com.BackEnd.dto.AddToCartRequest;
-import com.BackEnd.dto.CartBasicInfoDTO;
+import com.BackEnd.dto.BasicCartInfoDto;
 import com.BackEnd.dto.CartItemDTO;
 import com.BackEnd.model.Cart;
 import com.BackEnd.model.CartItem;
@@ -13,9 +13,12 @@ import com.BackEnd.repository.ProductRepository;
 import com.BackEnd.repository.UserRepository;
 import com.BackEnd.utils.DTOConverter;
 
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
@@ -32,7 +35,7 @@ public class CartService {
     private final ProductRepository productRepo;
     private final UserRepository userRepo;
 
-    public CartBasicInfoDTO getOrCreateActiveCartDTO(String userName) {
+    public BasicCartInfoDto getOrCreateActiveCartDTO(String userName) {
         User user = userRepo.findByUserName(userName)
                 .orElseThrow(() -> new RuntimeException("Not found user: " + userName));
         Cart cart = cartRepo.findCartByUserAndStatus(user, Cart.CartStatus.ACTIVE)
@@ -86,20 +89,41 @@ public class CartService {
         cartItemRepo.deleteByProductId(productId);
     }
 
+    public List<CartItem> getAllCartItemsInActiveCart(Long cartId) {
+        Cart cart = cartRepo.findById(cartId)
+                .orElseThrow(() -> new RuntimeException("Cart not found"));
+
+        return cart.getCartItems();
+
+    }
+
+    public Cart getCartByCartId(Long cartId) {
+        Cart cart = cartRepo.findById(cartId)
+                .orElseThrow(() -> new RuntimeException("No cart found"));
+        return cart;
+    }
+
+    public String changeCartStatus(Long cartId, Cart.CartStatus status) {
+        try {
+            Cart cart = getCartByCartId(cartId);
+            cart.setStatus(status);
+            cartRepo.save(cart);
+            return "Cart status updated successfully";
+        } catch (EntityNotFoundException e) {
+            return "Cart not found";
+        } catch (DataAccessException e) {
+            return "Database error while saving cart";
+        } catch (Exception e) {
+            return "An unexpected error occurred: " + e.getMessage();
+        }
+    }
+
     @Transactional
     public void clearCart(Long cartId) {
         Cart cart = cartRepo.findById(cartId)
                 .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
         cartItemRepo.deleteAll(cart.getCartItems());
         cart.getCartItems().clear();
-        cartRepo.save(cart);
-    }
-
-    @Transactional
-    public void checkoutCart(Long cartId) {
-        Cart cart = cartRepo.findById(cartId)
-                .orElseThrow(() -> new RuntimeException("Cart not found: " + cartId));
-        cart.setStatus(Cart.CartStatus.PAID);
         cartRepo.save(cart);
     }
 
@@ -126,9 +150,6 @@ public class CartService {
                             p.getProductId(),
                             p.getName(),
                             p.getPrice(),
-                            img,
-                            p.getBrand(),
-                            p.getDescription(),
                             ci.getQuantity());
                 })
                 .collect(Collectors.toList());
@@ -160,9 +181,12 @@ public class CartService {
                 p.getProductId(),
                 p.getName(),
                 p.getPrice(),
-                img,
-                p.getBrand(),
-                p.getDescription(),
                 cartItem.getQuantity());
     }
+
+    public User getUserByCartId(Long cartId) {
+        User user = cartRepo.findUserByCartId(cartId);
+        return user;
+    }
+
 }
