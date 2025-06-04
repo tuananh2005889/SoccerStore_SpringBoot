@@ -6,31 +6,6 @@
 
 ---
 
-## Table of Contents
-
-- [Features](#features)  
-- [Tech Stack](#tech-stack)  
-- [Getting Started](#getting-started)  
-  - [Prerequisites](#prerequisites)  
-  - [Clone & Build](#clone--build)  
-  - [Configuration](#configuration)  
-  - [Run the Application](#run-the-application)  
-- [API Endpoints](#api-endpoints)  
-  - [Authentication & Authorization](#authentication--authorization)  
-  - [Product Management](#product-management)  
-  - [Category Management](#category-management)  
-  - [Shopping Cart](#shopping-cart)  
-  - [Order Processing](#order-processing)  
-  - [User Management](#user-management)  
-- [Database Schema](#database-schema)  
-- [Project Structure](#project-structure)  
-- [Testing](#testing)  
-- [Contributing](#contributing)  
-- [License](#license)  
-- [Contact](#contact)  
-
----
-
 ## Features
 
 - **RESTful API** for all e-commerce operations  
