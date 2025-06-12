@@ -257,12 +257,7 @@ const Cart = () => {
                 {cartItems.map((item) => (
                   <div key={item.cartItemId} className="p-6 flex flex-col sm:flex-row items-center sm:items-start gap-4">
                     <div className="flex-shrink-0">
-                      <img
-                        src={item.image}
-                        alt={item.productName}
-                        className="w-24 h-24 rounded-lg object-cover shadow-sm"
-                        onError={(e) => (e.currentTarget.src = '/placeholder-product.jpg')}
-                      />
+                  
                     </div>
                     <div className="flex-1 flex flex-col sm:flex-row justify-between w-full">
                       <div className="flex-1 text-center sm:text-left mb-4 sm:mb-0">
